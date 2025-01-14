@@ -1,3 +1,9 @@
+// main.src
+// uncompiled main file. should be compiled using compiler.src program. compiler will replace "#" + "InjectionPoint" with all found modules in ./modules
+// one module has to implement a function called mainfunc, that will be called when the program is ran
+// DO NOT COMPILE BY HAND! USE COMPILER PROGRAM AND RUN THE RESULTING BINARY
+
+
 include = function(libname)
     if include_lib(libname) != null then return include_lib(path)
     
@@ -23,3 +29,5 @@ metaxploit = include("metaxploit.so")
 crypto = include("crypto.so")
 
 #InjectionPoint
+
+mainfunc()

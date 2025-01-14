@@ -1,0 +1,59 @@
+// compiler for main.src
+// this compiler only includes files ending in src or gs
+
+comp = get_shell.host_computer
+
+
+find_all_files = function(folder)
+    get_files = function(folder)
+        files = []
+        
+        for file in folder.get_files
+            if file.path[-4:] == ".src" or file.path[-3:] == ".gs" then files.push(file.path)
+        end for
+        
+        for subfolder in folder.get_folders
+            files = files + get_files(subfolder)
+        end for
+        
+        return files
+    end function
+    
+    return get_files(folder)
+end function
+
+get_new_src = function()
+    modules_root = comp.File(current_path + "/modules")
+    modules = find_all_files(modules_root)
+    
+    mainsrc = comp.File(current_path + "/main.src").get_content
+    
+    i = code("i")
+
+    modulesrc = ""
+    for module in modules
+        modulesrc = modulesrc + char(i) + "mport_code(""" + module + """)" + char(10)
+    end for
+    
+    return mainsrc.replace("#InjectionPoint", modulesrc)
+end function
+
+make_new_file = function(src)
+    temp_filename = "temp_main.src"
+    res = comp.touch(current_path, temp_filename)
+    if typeof(res) == "string" then exit("Error touching: " + res)
+
+    tmp = comp.File(current_path + "/" + temp_filename)
+    tmp.set_content(src)
+    res = get_shell.build(current_path + "/" + temp_filename, current_path, true)
+    if res != "" then exit("Error building: " + res)
+
+    comp.File(current_path + "/" + temp_filename[:-4]).rename("obama")
+    tmp.delete()
+
+    return current_path + "/obama"
+end function
+
+newsrc = get_new_src()
+bin_path = make_new_file(newsrc)
+get_shell.launch(bin_path)
