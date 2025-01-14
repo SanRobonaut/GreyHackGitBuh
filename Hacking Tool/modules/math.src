@@ -1,0 +1,20 @@
+lerp = function(a, b, t)
+    return a * (1 - t) + (b * t)
+end function
+
+random = function(min, max)
+    return floor(rnd * (max - min + 1) + min)
+end function
+
+generate_ip = function()
+    gen_ip = function()
+        return random(0, 255) + "." + random(0, 255) + "." + random(0, 255) + "." + random(0, 255)
+    end function
+    
+    ip = gen_ip
+    while not is_valid_ip(ip) or not get_router(ip)
+        ip = gen_ip
+    end while
+
+    return ip
+end function

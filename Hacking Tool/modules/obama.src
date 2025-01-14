@@ -1,0 +1,23 @@
+import_code("/Hacking Tool/modules/ui_helpers.src")
+
+actions = {}
+
+actions.hack = function()
+    print("Hacked")
+end function
+
+actions.scan = function()
+    print("Scanned")
+end function
+
+actions.scanlan = function()
+    print("Scanned (but on lan)")
+end function
+
+actions.privesc = function()
+    print("Privesced")
+end function
+
+actions.autohack = function()
+    print("Autobanked")
+end function

@@ -28,6 +28,18 @@ end function
 metaxploit = include("metaxploit.so")
 crypto = include("crypto.so")
 
+actions = {}
+mainfunc = function()
+    last_index = 0
+
+    while true
+        action = select_from_list(actions.indexes, last_index)
+        last_index = actions.indexes.indexOf(action)
+        actions[action]
+        user_input("", 0, 1)
+    end while
+end function
+
 #InjectionPoint
 
 mainfunc()
