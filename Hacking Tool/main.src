@@ -1,0 +1,25 @@
+include = function(libname)
+    if include_lib(libname) != null then return include_lib(path)
+    
+    comp = get_shell.host_computer
+
+    find = function(filename, folder)
+        for i in folder.get_files
+            if i.name == filename then return i
+        end for
+
+        for i in folder.get_folders
+            res = find(filename, i)
+            if res != null then return res
+        end for
+
+        return null
+    end function
+
+    return include_lib(find(libname, comp.File("/")).path)
+end function
+
+metaxploit = include("metaxploit.so")
+crypto = include("crypto.so")
+
+#InjectionPoint

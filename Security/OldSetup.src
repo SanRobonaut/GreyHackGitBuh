@@ -1,0 +1,168 @@
+if active_user != "root" then exit("ERROR: Program only works as root")
+
+file = function(path)
+    return get_shell.host_computer.File(path)
+end function
+
+doperms = function()
+    to_perms = function(string)
+        string = string.trim
+        if string.len != 10 then return null
+        sussy = string[1:]
+        usr = sussy[:3]
+        group = sussy[3:6]
+        other = sussy[6:]
+        amogus = [usr, group, other]
+        pp = (new _perms)["__isa"]
+        for x in range(0, 2)
+            for y in range(0, 2)
+                pp[pp.indexes[x]][pp[pp.indexes[x]].indexes[y]] = amogus[x][y] != "-"
+            end for
+        end for
+        pp.is_folder = string[0] == "d"
+        return pp
+    end function
+
+    _perms = {}
+    _perms.user = {"r": false, "w": false, "x": false, "prefix": "u"}
+    _perms.group = {"r": false, "w": false, "x": false, "prefix": "g"}
+    _perms.other = {"r": false, "w": false, "x": false, "prefix": "o"}
+
+    _perms.is_folder = false
+    _perms.to_string = function()
+        string = ""
+        if self.is_folder then string = string + "d" else string = string + "-"
+        for i in self.user.indexes[:3]
+            if self.user[i] then string = string + i else string = string + "-"
+        end for
+        for i in self.group.indexes[:3]
+            if self.group[i] then string = string + i else string = string + "-"
+        end for
+        for i in self.other.indexes[:3]
+            if self.other[i] then string = string + i else string = string + "-"
+        end for
+        return string
+    end function
+
+    _perms.apply = function(filamomguse)
+        amogus = [self.user, self.group, self.other]
+        fof = true
+        filamomguse.chmod("u-rwx", fof)
+        filamomguse.chmod("g-rwx", fof)
+        filamomguse.chmod("o-rwx", fof)
+        for sussy in amogus
+            string = ""
+            for i in range(0,2)
+                if sussy[sussy.indexes[i]] then
+                    string = string + sussy.indexes[i]
+                end if
+            end for
+            string = sussy["prefix"] + "+" + string
+            print(filamomguse.path + " | " + string)
+            filamomguse.chmod(string, fof)
+        end for
+    end function
+
+    select = function(prompt, options)
+        input = "amomgus"
+        index = 0
+        for option in options
+            print("[" + index + "]" + " " + option)
+            index = index + 1
+        end for
+        while typeof(input.to_int).lower == "string" or not options.hasIndex(input.to_int)
+            input = user_input(prompt).trim
+        end while
+
+        return input.to_int
+    end function
+
+    modes = ["Standard", "Custom"]
+    mode = modes.values[select(">", modes)]
+
+    if mode == "Standard" then
+        lock = to_perms("d---------")
+        lock.apply(file("/"))
+        homefolderamogus = to_perms("drwxr--r--")
+        homefolderamogus.apply(file("/home"))
+        owned = to_perms("drwxrwxrwx")
+        owned.apply(file("/bin"))
+        owned.apply(file("/usr"))
+        lib = to_perms("drw-r-xr-x")
+        lib.apply(file("/lib"))
+        file("/").chmod("u+r")
+        file("/").chmod("g+r")
+        file("/").chmod("o+r")
+    else if mode == "Custom" then
+        while true
+            path = user_input("Path (break to stop) >")
+            if path.lower == "break" then break
+            if not file(path) then
+                clear_screen
+                print("Path not found")
+                continue
+            end if
+            perms = user_input("Perms >")
+            if not to_perms(perms) then
+                clear_screen
+                print("Perms Invalid")
+                continue
+            end if
+            to_perms(perms).apply(file(path))
+            clear_screen
+            print("Applied " + to_perms(perms).to_string() + " to " + file(path).path)
+        end while
+    end if
+end function
+
+downloadstuff = function()
+    is_in_list = function(list, element)
+        if list.indexOf(element) == null then return false
+        return true
+    end function
+    
+    endswith = function(string, _end)
+        if string[-_end.len:] == _end then return true
+        return false
+    end function
+    
+    apt = include_lib("/lib/aptclient.so")
+    sources = file("/etc/apt/sources.txt").get_content
+    sources = sources.split("sourceList")[1]
+    sources = sources.split(char(10))[1:-2] // split by newlines
+    ips = []
+
+    for source in sources
+        ips.push(source.split("""")[1])
+    end for
+
+    programs = []
+
+    for ip in ips
+        i = apt.show(ip).split("<b>")[1:]
+        for j in i
+            k = j.split("</b>")[0]
+            if not is_in_list(programs, k) then programs.push(k)
+        end for
+    end for
+
+    get_install_path = function(name)
+        path = "/bin"
+        if endswith(program, ".so") then path = "/lib"
+        if endswith(program, ".exe") then path = "/usr/bin"
+        if endswith(program, ".txt") then path = home_dir
+        return path
+    end function
+
+    for program in programs
+        output = apt.install(program, get_install_path(program))
+        if output == true then
+            print("Succesfully installed " + program + "!")
+        else
+            print("Could not install " + program + "!" + char(10) + output)
+        end if        
+    end for
+end function
+
+downloadstuff()
+doperms()

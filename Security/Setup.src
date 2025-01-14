@@ -1,0 +1,64 @@
+chmod = function(file, perms, recursive = false)
+    out = file.chmod(perms, recursive)
+    if out != "" then print("chmod error: " + file.path + " | " + out)
+end function
+
+set_group = function(file, groupname)
+    for subfile in file.get_files
+        out = subfile.set_group(groupname)
+        if out != "" and out != null then print("set_group error: " + subfile.path + " | " + out)
+    end for
+end function
+
+comp = get_shell.host_computer
+
+userhome = comp.File(home_dir)
+username = userhome.owner
+usergroup = userhome.group
+print("User is " + username + " and part of group " + usergroup)
+
+root_shell = null
+
+while root_shell == null
+    inputPass = user_input("Password: ", true)
+    root_shell = get_shell("root", inputPass)
+end while
+
+comp = root_shell.host_computer
+
+fs_root = comp.File("/")
+
+usrbin = comp.File("/usr/bin")
+bin = comp.File("/bin")
+var = comp.File("/var")
+apt = comp.File("/etc/apt")
+
+home = comp.File("/home")
+guesthome = comp.File("/home/guest")
+
+chmod(fs_root, "u-rwx", true)
+chmod(fs_root, "g-rwx", true)
+chmod(fs_root, "o-rwx", true)
+
+chmod(usrbin, "u+rx", true)
+chmod(usrbin, "g+rx", true)
+set_group(usrbin, usergroup)
+
+chmod(bin, "u+rx", true)
+chmod(bin, "g+rx", true)
+set_group(bin, usergroup)
+comp.File("/bin/sudo").chmod("o+rx")
+
+chmod(var, "u+r", true)
+chmod(var, "g+r", true)
+set_group(var, usergroup)
+
+chmod(apt, "u+r", true)
+chmod(apt, "g+r", true)
+set_group(apt, usergroup)
+
+chmod(home, "u+rwx", true)
+chmod(home, "g+rwx", true)
+chmod(guesthome, "u-rwx", true)
+chmod(guesthome, "g-rwx", true)
+chmod(guesthome, "o-rwx", true)

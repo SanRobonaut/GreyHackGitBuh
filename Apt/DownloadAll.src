@@ -1,0 +1,51 @@
+downloadstuff = function()
+    is_in_list = function(list, element)
+        if list.indexOf(element) == null then return false
+        return true
+    end function
+    
+    endswith = function(string, _end)
+        if string[-_end.len:] == _end then return true
+        return false
+    end function
+    
+    apt = include_lib("/lib/aptclient.so")
+    sources = get_shell.host_computer.File("/etc/apt/sources.txt").get_content
+    sources = sources.split("sourceList")[1]
+    sources = sources.split(char(10))[1:-2] // split by newlines
+    
+    ips = []
+
+    for source in sources
+        ips.push(source.split("""")[1])
+    end for
+
+    programs = []
+
+    for ip in ips
+        i = apt.show(ip).split("<b>")[1:]
+        for j in i
+            k = j.split("</b>")[0]
+            if not is_in_list(programs, k) then programs.push(k)
+        end for
+    end for
+
+    get_install_path = function(name)
+        path = "/bin"
+        if endswith(program, ".so") then path = "/lib"
+        if endswith(program, ".exe") then path = "/usr/bin"
+        if endswith(program, ".txt") then path = home_dir
+        return path
+    end function
+
+    for program in programs
+        output = apt.install(program, get_install_path(program))
+        if output == true then
+            print("Succesfully installed " + program + " at " + get_install_path(program) + "!")
+        else
+            print("Could not install " + program + "!" + char(10) + output)
+        end if
+    end for
+end function
+
+downloadstuff()
