@@ -115,6 +115,7 @@ select_from_list = function(items, format_cols = false, starting_index = 0, disp
     current_index = starting_index
 
     display_normal = function()
+        clear_screen
         print(instruction_text, true)
         txt = ""
         if not info_header == "" and not info_header == null then txt = info_header + char(10)
@@ -131,6 +132,7 @@ select_from_list = function(items, format_cols = false, starting_index = 0, disp
     end function
 
     display_formatted = function()
+        clear_screen
         print(instruction_text, true)
         final_str = ""
         if not info_header == "" and not info_header == null then final_str = info_header + char(10)
@@ -264,8 +266,4 @@ show_error = function(text, anykey = true, fatal_error = false)
     else
         exit(text)
     end if
-end function
-
-display_test = function(x)
-    return x + " " + x * 8
 end function

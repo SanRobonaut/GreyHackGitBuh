@@ -1,0 +1,31 @@
+import_code("/Hacking Tool/modules/json.src")
+
+db = {}
+db.write_data = function(data, path)
+    comp = get_shell.host_computer
+    
+    content = json.Serialize(data)
+
+    comp.File(path).set_content(content)
+end function
+
+db.read_data = function(path)
+    comp = get_shell.host_computer
+
+    content = comp.File(path).get_content
+    return json.Deserialize(content)
+end function
+
+db.set_data = function(data, path, truncate = false)
+    if truncate then
+        obj = {}
+    else
+        obj = read_data(path)
+    end if
+
+    for i in data.indexes
+        obj[i] = data[i]
+    end for
+
+    write_data(obj, path)
+end function

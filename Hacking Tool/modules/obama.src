@@ -1,9 +1,67 @@
 import_code("/Hacking Tool/modules/ui_helpers.src")
+import_code("/Hacking Tool/modules/database.src")
 actions = {}
+
+VULN_DATABASE_PATH = home_dir + "/vuln_db"
+
+find_vulns = function(lib, vulns)
+    libkey = libname + "-" + libversion
+
+    vulns[libkey] = {}
+    vulns[libkey].vuln_areas = {}
+    areas = metaxploit.scan(lib)
+
+    for address in areas
+        scanAddress = metaxploit.scan_address(lib, address)
+        segments = scanAddress.split("Unsafe check: ")[1:]
+        exploits = []
+
+        for segment in segments
+            labelStart = segment.indexOf("<b>")
+            labelEnd = segment.indexOf("</b>")
+            exploits.push(segment[labelStart + 3: labelEnd])
+        end for
+
+        vulns[libkey].vuln_areas[address] = exploits
+    end for
+
+    return vulns
+end function
+
+hack_lib = function(lib, vulns = {})
+    libname = lib.lib_name
+    libversion = lib.version
+
+    libkey = libname + "-" + libversion
+
+    if not vulns.hasIndex(libkey) then
+        vulns = find_vulns(lib, vulns)
+        db.set_data(vulns, VULN_DATABASE_PATH)
+    end if
+
+    extra = user_input(["Extra overflow arg?", ">".bold].join(" "))
+
+    results = []
+    vuln_areas = vulns[libkey].vuln_areas.indexes
+    for area in vuln_areas
+        exploits = vulns[libkey].vuln_areas[area]
+        for exploit in exploits
+            results.push(lib.overflow(area, exploit, extra))
+        end for
+    end for
+
+    return results
+end function
 
 actions.hack = function()
     comp = get_shell.host_computer
     if not comp.is_network_active then return show_error("Computer has no internet access!")
+    vulns = db.read_data(VULN_DATABASE_PATH)
+    if vulns == null then 
+        show_error("Malformed vuln database! Overwriting previous values...", true, false)
+        vulns = {}
+        db.write_data(vulns, VULN_DATABASE_PATH)
+    end if
     
     ip = input_ip("Please input an IP to hack")
     if ip == null then return
@@ -52,7 +110,9 @@ actions.hack = function()
     clear_screen
 
     if selected_port == 0 then
-        // hack router
+        net_session = metaxploit.net_use(ip)
+        
+        lib = net_session.dump_lib
     else
         // hack port
     end if
