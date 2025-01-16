@@ -1,5 +1,21 @@
+string.replaceAt = function(index, newChar)
+    if index < 0 or index >= self.len then
+        exit("<color=red>Error! String replace index out of range!")
+    end if
+
+    return self[0:index] + newChar + self[index + 1:]
+end function
+
+string.numbers = function()
+    return "1234567890"
+end function
+
 string.bold = function()
     return "<b>" + self + "</b>"
+end function
+
+string.noparse = function()
+    return "<noparse>" + self + "</noparse>"
 end function
 
 string.italic = function()
@@ -89,7 +105,7 @@ rgba_to_hex = function(r, g, b, a)
     return hex
 end function
 
-select_from_list = function(items, starting_index = 0, display_func, instruction_text = "<b>LeftShift/Delete</b> to select, <b>W/Up</b> to move cursor up, <b>S/Down</b> to move cursor down")
+select_from_list = function(items, format_cols = false, starting_index = 0, display_func = null, instruction_text = "<b>Tab/Delete</b> to select, <b>W/Up</b> to move cursor up, <b>S/Down</b> to move cursor down", info_header = "")
     if display_func == null then 
         display_func = function(x) 
             return str(x) 
@@ -98,20 +114,158 @@ select_from_list = function(items, starting_index = 0, display_func, instruction
 
     current_index = starting_index
 
-    while true
+    display_normal = function()
         print(instruction_text, true)
+        txt = ""
+        if not info_header == "" and not info_header == null then txt = info_header + char(10)
+
         for i in range(0, items.len - 1)
             txt = display_func(items[i])
-            if current_index == i then txt = txt.mark(rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
+            if current_index == i then 
+                txt = txt.mark(rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
+            else
+                txt = txt.italic().mark(rgba_to_hex(255, 255, 255, 0))
+            end if
             print(txt)
         end for
+    end function
+
+    display_formatted = function()
+        print(instruction_text, true)
+        final_str = ""
+        if not info_header == "" and not info_header == null then final_str = info_header + char(10)
+        
+        txt = ""
+        for i in range(0, items.len - 1)
+            txt = display_func(items[i])
+            if current_index == i then 
+                txt = txt.mark(rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
+            else
+                txt = txt.italic().mark(rgba_to_hex(255, 255, 255, 0))
+            end if
+            final_str = final_str + txt + "\n"
+        end for
+
+        print(format_columns(final_str))
+    end function
+
+    while true
+        if format_cols then
+            display_formatted
+        else
+            display_normal
+        end if
 
         key = user_input("", false, true)
         if key == "UpArrow" or key == "w" then current_index = current_index - 1
         if key == "DownArrow" or key == "s" then current_index = current_index + 1
-        if key == "LeftShift" or key == "Delete" then return items[current_index]
+        if key == "Tab" or key == "Delete" then return items[current_index]
 
         if current_index == items.len then current_index = 0
         if current_index <= -1 then current_index = items.len - 1
     end while
+end function
+
+input_ip = function(prompt_text)
+    current_ip = "000.000.000.000"
+    selected_index = 0
+
+    get_ip_string = function(ip, highlight_index)
+        cur_index = 0
+        printstr = ""
+        for i in ip.values
+            if cur_index == highlight_index then
+                printstr = printstr + i.mark(rgba_to_hex(255, 255, 255, 0.1 * 255))
+            else
+                printstr = printstr + i
+            end if
+
+            cur_index = cur_index + 1
+        end for
+
+        return printstr
+    end function
+
+    string_to_ip = function(ip)
+        segments = ip.split("\.")
+        for i in range(0, segments.len - 1)
+            segments[i] = str(segments[i].val) // convert to number then back to string, to get rid of leading 0s
+        end for
+
+        return segments.join(".")
+    end function
+
+    move_cursor = function(selected_index, current_ip, direction)
+        if direction > 0 then
+            selected_index = selected_index + 1
+            if not selected_index >= current_ip.len then
+                if current_ip[selected_index] == "." then selected_index = selected_index + 1
+            end if
+        else if direction < 0 then
+            selected_index = selected_index - 1
+            if not selected_index < 0 then
+                if current_ip[selected_index] == "." then selected_index = selected_index - 1
+            end if
+        end if
+
+        if selected_index >= current_ip.len then selected_index = 0
+        if selected_index < 0 then selected_index = current_ip.len - 1
+
+        return selected_index
+    end function
+
+    should_print = true
+    while true
+        if should_print then
+            print(["Please use your ", "number keys".bold, " to input an IP. ", "Arrows".bold, " to move and ", "Tab".bold, " to submit. ", "Q".bold, " to cancel"].join(""), true)
+            if prompt_text != null then print(prompt_text)
+            printstr = get_ip_string(current_ip, selected_index)
+            print(printstr)
+            should_print = false
+        end if
+        
+        key = user_input("", false, true)
+        if key == "" or key == " " then continue
+
+        if string.numbers().indexOf(key) != null then
+            should_print = true
+            current_ip = current_ip.replaceAt(selected_index, key)
+            selected_index = move_cursor(selected_index, current_ip, 1)
+        
+        else if key == "LeftArrow" then
+            should_print = true
+            selected_index = move_cursor(selected_index, current_ip, -1)
+        
+        else if key == "RightArrow" then
+            should_print = true
+            selected_index = move_cursor(selected_index, current_ip, 1)
+        
+        else if key == "Tab" then
+            should_print = true
+            sanitized = string_to_ip(current_ip)
+            if is_valid_ip(sanitized) then
+                return sanitized
+            else
+                user_input("Error! Invalid IP", false, true)
+            end if
+        
+        else if key.lower == "q" then
+            return null
+        end if
+    end while
+end function
+
+show_error = function(text, anykey = true, fatal_error = false)
+    text = "<color=red>" + text
+
+    if not fatal_error then
+        user_input(text, false, anykey)
+        return null
+    else
+        exit(text)
+    end if
+end function
+
+display_test = function(x)
+    return x + " " + x * 8
 end function

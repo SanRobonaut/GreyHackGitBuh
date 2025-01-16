@@ -1,0 +1,5 @@
+while true
+    keycode = ""
+    keycode = user_input("", false, true)
+    print(keycode)
+end while

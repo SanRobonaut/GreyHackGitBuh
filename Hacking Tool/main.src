@@ -1,6 +1,8 @@
 // main.src
 // uncompiled main file. should be compiled using compiler.src program. compiler will replace "#" + "InjectionPoint" with all found modules in ./modules
-// one module has to implement a function called mainfunc, that will be called when the program is ran
+// modules can add functions to the `actions` obj, which will be displayed to the user in a selection menu and ran when selected. args must be passed separately
+// overwriting the mainfunc from a module is possible, though not necessary unless the dev wishes to do so
+// modules all have access to the metaxploit and crypto libraries, named such, as well
 // DO NOT COMPILE BY HAND! USE COMPILER PROGRAM AND RUN THE RESULTING BINARY
 
 
@@ -26,14 +28,17 @@ include = function(libname)
 end function
 
 metaxploit = include("metaxploit.so")
+if metaxploit == null then exit("<color=red>metaxploit.so could not be located!")
+
 crypto = include("crypto.so")
+if crypto == null then exit("<color=red>crypto.so could not be located!")
 
 actions = {}
 mainfunc = function()
     last_index = 0
 
     while true
-        action = select_from_list(actions.indexes, last_index)
+        action = select_from_list(actions.indexes, false, last_index)
         last_index = actions.indexes.indexOf(action)
         actions[action]
         user_input("", 0, 1)
