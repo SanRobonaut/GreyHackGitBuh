@@ -1,3 +1,50 @@
+list.map = function(func)
+    for i in range(0, self.len - 1)
+        self[i] = func(self[i])
+    end for
+
+    return self
+end function
+
+list.clone = function()
+    result = []
+    for i in self.indexes
+        if self[i] isa list or self[i] isa map then
+            result.push(self[i].clone)
+        else
+            result.push(self[i])
+        end if
+    end for
+    return result
+end function
+
+list.space_horizontal = function()
+    strip_style = function(text)
+        return text.raw_text
+    end function
+
+    strings = self.clone.map(@str)
+
+    count = strings.len
+    raws = strings.clone.map(@strip_style)
+    finalstr = ""
+    
+    current_len = 0
+    full_len = raws.join("").len
+
+    for i in range(0, count - 1)
+        finalstr = finalstr + strings[i].pos(current_len / full_len * 100 + "%")
+        current_len = current_len + raws[i].len
+    end for
+
+    return finalstr
+end function
+
+string.raw_text = function()
+    tags = "align|alpha|color|b|i|cspace|font|indent|line-height|line-indent|link|lowercase|uppercase|smallcaps|margin|mark|mspace|noparse|nobr|page|pos|size|space|sprite|s|u|style|sub|sup|voffset|width|link|#[0-9a-f]{3}|#[0-9a-f]{6}"
+    return self.replace("<\/?(" + tags + ")(\s.*?|=.*?|.{0})>", "")
+end function
+
 string.replaceAt = function(index, newChar)
     if index < 0 or index >= self.len then
         exit("<color=red>Error! String replace index out of range!")
@@ -8,6 +55,14 @@ end function
 
 string.numbers = function()
     return "1234567890"
+end function
+
+string.capitalize = function()
+    if self.len > 1 then
+        return self[0].upper + self[1:]
+    else
+        return self.upper
+    end if
 end function
 
 string.bold = function()
@@ -266,4 +321,84 @@ show_error = function(text, anykey = true, fatal_error = false)
     else
         exit(text)
     end if
+end function
+
+select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/Right/A/D</b> to move in header, <b>Up/Down/W/S</b> to move in list, <b>Tab</b> to select/lock, <b>Backspace</b> to go back;   <b>Please select a result to exploit</b>", starting_header_index = 0, starting_list_index = 0)
+    if display_funcs == null then display_funcs = {}
+
+    current_header_index = starting_header_index
+    current_list_index = starting_list_index
+    in_header = true
+
+    display_header = function()
+        header_display = []
+        for key in obj.indexes
+            count = obj[key].len
+            if count > 0 then 
+                text = str(count) + " " + key.capitalize
+                if count > 1 then text = text + "s" // :)
+                
+                if obj.indexes[current_header_index] == key then
+                    text = text.mark(rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
+                else
+                    text = text.italic()
+                end if
+                header_display.push(text)
+            end if
+        end for
+        return header_display.space_horizontal
+    end function
+
+    display_list = function()
+        current_key = obj.indexes[current_header_index]
+        current_items = obj[current_key]
+        display_text = ""
+
+        for i in range(0, current_items.len - 1)
+            item = current_items[i]
+            item_text = str(item)
+            if not display_funcs.indexes.indexOf(current_key.lower) == null then item_text = display_funcs[current_key.lower](item)
+            if i == current_list_index and not in_header then
+                item_text = item_text.mark(rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
+            else
+                item_text = item_text.italic()
+            end if
+            display_text = display_text + item_text + char(10)
+        end for
+
+        //display_text = display_text + display_funcs[current_key.lower] + " | " + display_funcs[current_key.lower](current_items[0])
+
+        return display_text
+    end function
+
+    while true
+        current_list_index = current_list_index % obj[obj.indexes[current_header_index]].len
+        if current_list_index == -1 then current_list_index = obj[obj.indexes[current_header_index]].len - 1
+        clear_screen
+        print(instruction_text, true)
+        print(display_header())
+        print("---")
+        print(display_list())
+
+        key = user_input("", false, true)
+
+        if in_header then
+            if key == "LeftArrow" or key == "a" then current_header_index = (current_header_index - 1) % obj.indexes.len
+            if key == "RightArrow" or key == "d" then current_header_index = (current_header_index + 1) % obj.indexes.len
+            if key == "Tab" and obj[obj.indexes[current_header_index]].len > 0 then
+                in_header = false
+                current_list_index = 0
+            end if
+        else
+            if key == "UpArrow" or key == "w" then 
+                current_list_index = (current_list_index - 1) % obj[obj.indexes[current_header_index]].len
+            else if key == "DownArrow" or key == "s" then 
+                current_list_index = (current_list_index + 1) % obj[obj.indexes[current_header_index]].len
+            else if key == "Backspace" then 
+                in_header = true
+            else if key == "Tab" then
+                return [obj[obj.indexes[current_header_index]][current_list_index], obj.indexes[current_header_index]]
+            end if
+        end if
+    end while
 end function

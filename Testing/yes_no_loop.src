@@ -1,0 +1,11 @@
+while true
+    print("Doing something...")
+
+    key = ""
+    print("Select another result? (Y/n) >")
+    while not "Öyn".indexOf(key) // Ö for fun
+        key = user_input("", false, true).lower
+    end while
+
+    if key == "n" then break
+end while

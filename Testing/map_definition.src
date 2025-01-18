@@ -1,0 +1,7 @@
+seggs = {
+    "a": 3,
+    "b": 4 // testing if clean and beautified syntax works in map definitions now
+    // it does
+}
+
+print(seggs.b)

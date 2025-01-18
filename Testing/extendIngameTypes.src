@@ -1,0 +1,14 @@
+file.mogus = function(self) // file not found in scope
+    print(self.path)
+end function
+
+obj = get_shell.host_computer.File("/")
+print(obj)
+
+for i in obj.indexes
+    if not i == "__isa" then print(i + ": " + obj[i])
+end for
+
+for i in obj["__isa"].indexes
+    if not i == "__isa" then print(i + ": " + obj[i])
+end for

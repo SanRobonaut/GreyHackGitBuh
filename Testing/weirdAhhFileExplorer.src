@@ -1,0 +1,181 @@
+// Utility function to get user input
+get_user_input = function(prompt, hide_input = false, single_key = false)
+    // Implementation to get user input
+    return user_input(prompt, hide_input, single_key)
+    // Return the input as a string
+end function
+
+// Utility function to display text with optional formatting
+display_text = function(text, bold = false, italic = false)
+    // Implementation to display text with formatting
+    if bold then text = "<b>" + text + "</b>"
+    if italic then text = "<i>" + text + "</i>"
+    print(text)
+end function
+
+file_type = function(file)
+    if file.is_folder then return "Folder"
+    if file.is_binary then return "Binary"
+    if file.is_symlink then return "Symlink"
+    return "File"
+end function
+
+// Function to display the current directory and its contents
+display_directory = function(current_dir, selected_index, in_action_menu, selected_action_index)
+    clear_screen
+    print(current_dir)
+    display_text("Current Directory: " + current_dir.path, true)
+    display_text("Use Arrow Keys or W/A/S/D to navigate, Tab to select, Backspace to go back, Escape to exit", false, true)
+    
+    folders = current_dir.get_folders()
+    files = current_dir.get_files()
+    items = folders + files
+
+    for i in range(0, items.len - 1)
+        item = items[i]
+        item_name = item.name()
+        item_owner = item.owner()
+        item_group = item.group()
+        item_permissions = item.permissions()
+        item_size = item.size()
+        item_type = file_type(item) // Assume file_type() returns "Folder", "File", etc.
+
+        display_str = item_name + " " + item_owner + " " + item_group + " " + item_permissions + " " + item_size + " " + item_type
+        if i == selected_index then
+            display_text(display_str, true)
+
+            if in_action_menu then
+                item = (current_dir.get_folders() + current_dir.get_files())[selected_index]
+                display_action_menu(item, selected_action_index)
+            end if
+        else
+            display_text(display_str)
+        end if
+    end for
+end function
+
+// Handlers for file operations
+file_handlers = {}
+file_handlers["Download"] = function(file)
+        // Implementation to download the file
+end function
+
+file_handlers["Modify"] = function(file)
+        // Implementation to modify the file
+end function
+
+file_handlers["Delete"] = function(file)
+        // Implementation to delete the file
+end function
+
+file_handlers["Rename"] = function(file)
+        // Implementation to rename the file
+end function
+
+file_handlers["Change Permissions"] = function(file)
+        // Implementation to change file permissions
+end function
+
+file_handlers["Move"] = function(file)
+        // Implementation to move the file
+end function
+
+file_handlers["Change Ownership"] = function(file)
+        // Implementation to change file ownership
+end function
+
+file_handlers["Decipher"] = function(file)
+        // Implementation to decipher the file
+end function
+
+get_possible_actions = function(item)
+    actions = []
+    if item.is_folder then
+        actions = ["Enter", "Rename", "Delete", "Change Permissions", "Move", "Change Ownership"]
+    else
+        actions = ["Download", "Modify", "Rename", "Delete", "Change Permissions", "Move", "Change Ownership"]
+        if not item.is_binary and not item.is_symlink then
+            actions.append("Decipher")
+        end if
+    end if
+
+    return actions
+end function
+
+// Function to display the action submenu for a selected item
+display_action_menu = function(item, selected_action_index)
+    actions = get_possible_actions(item)
+
+    for i in range(0, actions.len - 1)
+        action = actions[i]
+        if i == selected_action_index then
+            display_text("  " + action, true)
+        else
+            display_text("  " + action)
+        end if
+    end for
+end function
+
+// Main file explorer function
+file_explorer = function(initial_dir)
+    current_dir = initial_dir
+    selected_index = 0
+    in_action_menu = false
+    selected_action_index = 0
+
+    while true
+        if selected_index < 0 then selected_index = current_dir.get_folders().len + current_dir.get_files().len - 1
+        
+        display_directory(current_dir, selected_index, in_action_menu, selected_action_index)
+
+        key = get_user_input("", false, true)
+        if key == "UpArrow" or key == "w" then
+            if in_action_menu then
+                item = (current_dir.get_folders() + current_dir.get_files())[selected_index]
+                actions = get_possible_actions(item)
+                selected_action_index = (selected_action_index - 1) % actions.len
+                if selected_action_index < 0 then selected_action_index = actions.len - 1
+            else
+                selected_index = (selected_index - 1) % (current_dir.get_folders().len + current_dir.get_files().len)
+            end if
+        end if
+        if key == "DownArrow" or key == "s" then
+            if in_action_menu then
+                item = (current_dir.get_folders() + current_dir.get_files())[selected_index]
+                actions = get_possible_actions(item)
+                selected_action_index = (selected_action_index + 1) % actions.len
+            else
+                selected_index = (selected_index + 1) % (current_dir.get_folders().len + current_dir.get_files().len)
+            end if
+        end if
+        if key == "Tab" then
+            if in_action_menu then
+                item = (current_dir.get_folders() + current_dir.get_files())[selected_index]
+                actions = get_possible_actions(item)
+                action = actions[selected_action_index]
+                file_handlers[action](item)
+                in_action_menu = false
+            else
+                in_action_menu = true
+            end if
+        end if
+        if key == "Backspace" then
+            if in_action_menu then
+                in_action_menu = false
+            else
+                parent_dir = current_dir.parent()
+                if parent_dir != null then
+                    current_dir = parent_dir
+                    selected_index = 0
+                end if
+            end if
+        end if
+        if key == "Escape" then
+            exit()
+        end if
+    end while
+end function
+
+// Initialize the file explorer with the root directory
+root_dir = get_shell.host_computer.File("/")
+file_explorer(root_dir)
