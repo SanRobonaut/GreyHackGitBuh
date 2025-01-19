@@ -1,5 +1,3 @@
-// THIS FILE WAS MOVED AND FURTHER MODIFIED IN /Hacking Tool/modules/file_explorer.src THIS IS SIMPLY LEFT AS A TESTING AND DOCUMENTATION FALLBACK
-
 FileExplorer = {
     "current_dir": null,
     "selected_index": 0,
@@ -22,9 +20,10 @@ end function
 
 // Determine the type of a file
 FileExplorer.file_type = function(file)
+    if not typeof(file).lower == "file" then return "Unknown"
     if file.is_folder then return "Folder"
     if file.is_binary then return "Binary"
-    if file.is_symlink then return "Symlink"
+    //if file.is_symlink then return "Symlink"
     return "File"
 end function
 
@@ -35,6 +34,10 @@ FileExplorer.display_directory = function()
     self.display_text("Use Arrow Keys or W/A/S/D to navigate, Tab to select, Backspace to go back, Escape to exit", false, true)
     
     items = self.current_dir.get_folders() + self.current_dir.get_files()
+    if items.len <= 0 then
+        print("Nothing in here :c")
+        return
+    end if
 
     for i in range(0, items.len - 1)
         item = items[i]
@@ -75,11 +78,12 @@ end function
 FileExplorer.get_possible_actions = function(item)
     actions = []
     if item.is_folder then
-        actions = ["Enter", "Rename", "Delete", "Change Permissions", "Move", "Change Ownership"]
+        actions = ["Enter", "Rename", "Delete", "Change Permissions", "Move", "Change Owner"]
     else
-        actions = ["Rename", "Delete", "Change Permissions", "Move", "Change Ownership"]
-        if not item.is_binary and not item.is_symlink then
-            actions = actions + ["Decipher", "Download", "Modify"]
+        actions = ["Rename", "Delete", "Change Permissions", "Move", "Change Owner"]
+        //if not item.is_binary and not item.is_symlink then
+        if not item.is_binary then
+                actions = actions + ["Read", "Download", "Modify", "Decipher"]
         end if
     end if
     return actions
@@ -96,6 +100,8 @@ FileExplorer.get_permstring = function(permstring)
 end function
 
 FileExplorer.file_handlers["Change Permissions"] = function(file)
+    print(char(10) * 2)
+
     permstring = ""
     while true
         permstring = user_input("Please input the new permissions. (eg. ug+rx)" + char(10) + """a"" for all perms. ""quit"" to quit. >").lower
@@ -105,10 +111,11 @@ FileExplorer.file_handlers["Change Permissions"] = function(file)
         if not permstring == "" then break
     end while
 
-    // CUSTOM CHMOD PROCESSOR
+    // CUSTOM CHMOD PREPROCESSOR
     // strings can be of format [ugo]{1,3}([\+\-][rwx]{1,3}){1,2}
     // i.e: ug+rx-w | u+r | g+r-x | o-w+r
 
+    if not typeof(permstring) == "string" then permstring = permstring[0]
     segments = permstring.split("[+-]")
     if segments.len < 2 then return
     target = segments[0]
@@ -121,43 +128,120 @@ FileExplorer.file_handlers["Change Permissions"] = function(file)
 
         for i in target
             out = file.chmod(i + operator + segment, file.is_folder)
+            if not out == "" then
+                return show_error("Chmod error: " + out)
+            end if
         end for
     end for
+    user_input("Successfully updated file permissions!", false, true)
 end function
 
 FileExplorer.file_handlers["Rename"] = function(file)
+    print
+    print
 
+    newName = user_input("Please input the new file name. >")
+    err = file.rename(newName)
+    if typeof(err) == "string" and err != "" then return show_error("Rename error: " + err)
+    user_input("Successfully renamed to " + file.name + "!", false, true)
 end function
 
 FileExplorer.file_handlers["Delete"] = function(file)
-
-end function
-
-FileExplorer.file_handlers["Change Permissions"] = function(file)
-
+    err = file.delete
+    if not err == "" then return show_error("Delete error: " + err)
+    user_input("Successfully deleted file!", false, true)
 end function
 
 FileExplorer.file_handlers["Move"] = function(file)
+    print
+    print
 
+    newPath = user_input("Please input the new file path. >")
+    err = file.move(newPath, file.name)
+    if typeof(err) == "string" and err != "" then return show_error("Move error: " + err)
+    user_input("Successfully changed path to " + newPath + "!", false, true)
 end function
 
-FileExplorer.file_handlers["Change Ownership"] = function(file)
+FileExplorer.file_handlers["Change Owner"] = function(file)
+    print
+    print
 
+    newOwner = user_input("Please input the new file owner's name. >")
+    err = file.set_owner(newOwner, true)
+    if typeof(err) == "string" and err != "" then return show_error("Set Owner error: " + err)
+    user_input("Successfully changed owner to " + newOwner + "!", false, true)
+end function
+
+FileExplorer.file_handlers["Change Group"] = function(file)
+    print
+    print
+
+    newGroup = user_input("Please input the new file group's name. >")
+    err = file.set_group(newGroup, true)
+    if typeof(err) == "string" and err != "" then return  show_error("Set Group error: " + err)
+    user_input("Successfully changed group to " + newGroup + "!", false, true)
 end function
 
 // FILE ONLY
 FileExplorer.file_handlers["Decipher"] = function(file) 
+    enc = file.get_content.split(":")[1]
+    dec = crypto.decipher(enc)
 
+    print
+    print
+    user_input("Deciphered! " + file.get_content.split(":")[0] + ":" + dec, false, true)
 end function
 
 FileExplorer.file_handlers["Download"] = function(file)
+    content = file.get_content
+    comp = get_shell.host_computer
+    
+    err = comp.touch(home_dir, "DL_" + file.name)
+    if typeof(err) == "string" and err != "" then
+        return show_error("Download error! Couldn't create local file: " + err)
+    else
+        filePath = home_dir + "/DL_" + file.name
+        comp.File(filePath).set_content(content)
 
+        user_input("Successfully downloaded file to " + filePath + "!", false, true)
+    end if
 end function
 
 FileExplorer.file_handlers["Modify"] = function(file)
+    clear_screen
+    comp = get_shell.host_computer
+    
+    print("Creating local input file...")
+    temp_file_name = "OBAMA_INPUTFILE.txt"
+    temp_file_path = home_dir + "/" + temp_file_name
+    err = comp.touch(home_dir, temp_file_name)
 
+    if typeof(err) == "string" and err != "" then
+        return show_error("Modify error! Couldn't create local file: " + err)
+    else
+        print(["Created temporary input file. Go to", temp_file_path.italic, "to edit contents. Resume this program once you have written all of the new contents."].join(" ").bold.size("200%"))
+        user_input("")
+
+        content = comp.File(temp_file_path).get_content
+        comp.File(temp_file_path).delete
+        err = file.set_content(content)
+
+        if typeof(err) == "string" and err != "" then
+            return show_error("Modify error! Couldn't write to remote file: " + err)
+        else if err == 0 then
+            return show_error("Modify error! Couldn't write to remote file!")
+        end if
+
+        user_input("Successfully modified remote file!", false, true)
+    end if
 end function
 
+FileExplorer.file_handlers["Read"] = function(file) 
+    clear_screen
+    print(file.get_content)
+
+    user_input("", false, true)
+end function
 
 // Main function to start the file explorer
 FileExplorer.run = function(starting_dir)
@@ -186,6 +270,7 @@ FileExplorer.run = function(starting_dir)
             end if
         end if
         if key == "Tab" then
+            if items.len == 0 then continue
             if self.in_action_menu then
                 item = items[self.selected_index]
                 actions = self.get_possible_actions(item)
@@ -208,11 +293,7 @@ FileExplorer.run = function(starting_dir)
             end if
         end if
         if key == "Escape" then
-            exit()
+            return
         end if
     end while
 end function
-
-// Start the file explorer with the root directory
-root_dir = get_shell.host_computer.File("/")
-FileExplorer.run(root_dir)
