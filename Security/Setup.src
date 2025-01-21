@@ -1,7 +1,40 @@
-chmod = function(file, perms, recursive = false)
-    out = file.chmod(perms, recursive)
-    if out != "" then print("chmod error: " + file.path + " | " + out)
+get_permstring = function(permstring)
+    if permstring == "a" then return "ugo+rwx" // internal code for all perms
+    return permstring.matches("[ugo]{1,3}([\+\-][rwx]{1,3}){1,2}")
 end function
+
+chmod = function(file, permstring, recursive = true)
+    permstring = get_permstring(permstring)
+    if permstring == "" then return
+
+    // CUSTOM CHMOD PREPROCESSOR
+    // strings can be of format [ugo]{1,3}([\+\-][rwx]{1,3}){1,2}
+    // i.e: ug+rx-w | u+r | g+r-x | o-w+r
+
+    if not typeof(permstring) == "string" then permstring = permstring[0]
+    segments = permstring.split("[+-]")
+    if segments.len < 2 then return
+    target = segments[0]
+    segments.remove(0)
+
+    offset = target.len
+    for segment in segments
+        operator = permstring[offset]
+        offset = offset + segment.len + 1 // increment by length of current segment plus the operator
+
+        for i in target
+            out = file.chmod(i + operator + segment, file.is_folder)
+            if not out == "" then
+                print("<color=red>Chmod error: " + out + "</color>")
+            end if
+        end for
+    end for
+end function
+
+// chmod = function(file, perms, recursive = false)
+//     out = file.chmod(perms, recursive)
+//     if out != "" then print("chmod error: " + file.path + " | " + out)
+// end function
 
 set_group = function(file, groupname)
     for subfile in file.get_files
@@ -36,29 +69,20 @@ apt = comp.File("/etc/apt")
 home = comp.File("/home")
 guesthome = comp.File("/home/guest")
 
-chmod(fs_root, "u-rwx", true)
-chmod(fs_root, "g-rwx", true)
-chmod(fs_root, "o-rwx", true)
+chmod(fs_root, "ugo-rwx")
 
-chmod(usrbin, "u+rx", true)
-chmod(usrbin, "g+rx", true)
+chmod(usrbin, "ug+rx")
 set_group(usrbin, usergroup)
 
-chmod(bin, "u+rx", true)
-chmod(bin, "g+rx", true)
+chmod(bin, "ug+rx")
 set_group(bin, usergroup)
 comp.File("/bin/sudo").chmod("o+rx")
 
-chmod(var, "u+r", true)
-chmod(var, "g+r", true)
+chmod(var, "ug+r")
 set_group(var, usergroup)
 
-chmod(apt, "u+r", true)
-chmod(apt, "g+r", true)
+chmod(apt, "ug+r")
 set_group(apt, usergroup)
 
-chmod(home, "u+rwx", true)
-chmod(home, "g+rwx", true)
-chmod(guesthome, "u-rwx", true)
-chmod(guesthome, "g-rwx", true)
-chmod(guesthome, "o-rwx", true)
+chmod(home, "ug+rwx")
+chmod(guesthome, "ugo-rwx")
