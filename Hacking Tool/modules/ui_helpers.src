@@ -166,7 +166,7 @@ number.whole = function()
 end function
 
 select_from_list = function(items, format_cols = false, starting_index = 0, display_func = null, instruction_text = null, info_header = "")
-    if instruction_text == null then instruction_text = "<b>Tab/Delete</b> to select, <b>W/Up</b> to move cursor up, <b>S/Down</b> to move cursor down".color(colors.info)
+    if instruction_text == null then instruction_text = "<b>Tab/Delete</b> to select, <b>W/Up</b> to move cursor up, <b>S/Down</b> to move cursor down, <b>Escape</b> to quit".color(colors.info)
 
     if display_func == null then 
         display_func = function(x) 
@@ -227,6 +227,7 @@ select_from_list = function(items, format_cols = false, starting_index = 0, disp
         if key == "UpArrow" or key == "w" then current_index = current_index - 1
         if key == "DownArrow" or key == "s" then current_index = current_index + 1
         if key == "Tab" or key == "Delete" then return items[current_index]
+        if key == "Escape" then return null
 
         if current_index == items.len then current_index = 0
         if current_index <= -1 then current_index = items.len - 1
@@ -333,7 +334,7 @@ show_error = function(text, anykey = true, fatal_error = false)
     end if
 end function
 
-select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/Right/A/D</b> to move in header, <b>Up/Down/W/S</b> to move in list, <b>Tab</b> to select/lock, <b>Backspace</b> to go back;   <b>Please select a result to exploit</b>", starting_header_index = 0, starting_list_index = 0)
+select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/Right/A/D</b> to move in header, <b>Up/Down/W/S</b> to move in list, <b>Tab</b> to select/lock, <b>Backspace</b> to go back, <b>Escape</b> to quit;   <b>Please select a result to exploit</b>", starting_header_index = 0, starting_list_index = 0)
     if not display_funcs then display_funcs = {}
     if not obj then return show_error("Select From Map Error: Object was not set", true, false)
 
@@ -398,7 +399,8 @@ select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/
         print(display_list())
 
         key = user_input(" ", false, true)
-
+        if key == "Escape" then return null
+        
         if in_header then
             if key == "LeftArrow" or key == "a" then current_header_index = (current_header_index - 1) % obj.indexes.len
             if key == "RightArrow" or key == "d" then current_header_index = (current_header_index + 1) % obj.indexes.len

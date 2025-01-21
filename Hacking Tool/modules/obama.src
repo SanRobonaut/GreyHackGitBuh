@@ -153,6 +153,8 @@ eval_results = function(results)
 
     while true
         selected = select_result(results)
+        if selected == null then break
+
         type = selected[1]
         result = selected[0]
         
@@ -240,6 +242,7 @@ actions.hack = function()
                                          "> Select a port to hack",
                                          ["PORT", "STATE", "SERVICE", "VERSION", "LAN"].map(@setColorFunc).join(" "))
         clear_screen
+        if selected_port == null then return null
 
         net_session = null
         if selected_port == 0 then
