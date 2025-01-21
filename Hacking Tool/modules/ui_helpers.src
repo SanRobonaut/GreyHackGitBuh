@@ -227,7 +227,7 @@ input_ip = function(prompt_text)
         printstr = ""
         for i in ip.values
             if cur_index == highlight_index then
-                printstr = printstr + i.mark(colors.rgba_to_hex(255, 255, 255, 0.1 * 255)).color(colors.teal)
+                printstr = printstr + i.mark(colors.rgba_to_hex(255, 255, 255, 0.2 * 255)).underline()
             else
                 printstr = printstr + i
             end if

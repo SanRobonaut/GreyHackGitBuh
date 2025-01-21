@@ -1,5 +1,3 @@
-import_code("/Hacking Tool/modules/ui_helpers.src")
-
 colors = {}
 
 colors.text           = "#ffffff"
@@ -110,8 +108,9 @@ colors.mix = function(color1, color2, t)
 end function
 
 __print = @print
-print = function(text)
+print = function(text, replaceText = false)
+    text = str(text)
     if not text.is_match("<color") then text = text.color(colors.text)
 
-    __print(text)
+    __print(text, replaceText)
 end function

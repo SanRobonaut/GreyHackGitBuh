@@ -1,36 +1,3 @@
-// // DEBUG: REMOVE FIRST 3 LINES OF CODE AND LAST LINE
-// import_code("/Hacking Tool/modules/ui_helpers.src")
-// import_code("/Hacking Tool/modules/database.src")
-// import_code("/Hacking Tool/modules/file_explorer.src")
-// include = function(libname)
-//     if include_lib(libname) != null then return include_lib(path)
-    
-//     comp = get_shell.host_computer
-
-//     find = function(filename, folder)
-//         for i in folder.get_files
-//             if i.name == filename then return i
-//         end for
-
-//         for i in folder.get_folders
-//             res = find(filename, i)
-//             if res != null then return res
-//         end for
-
-//         return null
-//     end function
-
-//     return include_lib(find(libname, comp.File("/")).path)
-// end function
-
-// metaxploit = include("metaxploit.so")
-// if metaxploit == null then exit("<color=red>metaxploit.so could not be located!")
-
-// crypto = include("crypto.so")
-// if crypto == null then exit("<color=red>crypto.so could not be located!")
-// actions = {}
-// // END OF TOP DEBUG
-
 VULN_DATABASE_PATH = home_dir + "/vuln_db"
 
 find_vulns = function(lib, vulns)
@@ -59,7 +26,6 @@ end function
 
 hack_lib = function(lib, vulns = {})
     if not vulns then vulns = {}
-    // TODO: fix lib always being scanned
 
     libname = lib.lib_name
     libversion = lib.version
@@ -134,7 +100,7 @@ eval_result = function(res, type)
         user_input(x, false, true)
     end function
     eval_funcs["number"] = function(x)
-        user_input(x, false, true)
+        user_input(str(x), false, true)
     end function
     eval_funcs["shell"] = function(x)
         x.start_terminal
@@ -150,7 +116,6 @@ eval_result = function(res, type)
 
         FileExplorer.run(x)
     end function
-    // TODO: IDK ob exiting out of file explorer works properly usw might need to check uwu
     eval_funcs[type](res)
 end function
 
@@ -271,10 +236,11 @@ actions.hack = function()
         if not net_session then return show_error("Could not establish net_session!", true, false)
 
         lib = net_session.dump_lib
-        results = hack_lib(lib)
+        results = hack_lib(lib, vulns)
 
         eval_results(results)
 
+        clear_screen
         key = ""
         print("Hack another port? (Y/n) >".size(120).bold)
         while not "Öyn".indexOf(key) // Ö for fun
@@ -299,4 +265,8 @@ end function
 
 actions.autohack = function()
     print("Autobanked")
+end function
+
+actions.exit = function()
+    exit()
 end function

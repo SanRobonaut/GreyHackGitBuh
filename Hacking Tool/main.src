@@ -45,6 +45,13 @@ mainfunc = function()
     end while
 end function
 
-#InjectionPoint
+#include modules/database.src;
+#include modules/file_explorer.src;
+#include modules/getUser.src;
+#include modules/json.src;
+#include modules/math.src;
+#include modules/obama.src;
+#include modules/styling.src;
+#include modules/ui_helpers.src;
 
 mainfunc()

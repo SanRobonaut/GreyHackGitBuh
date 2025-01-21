@@ -1,0 +1,1712 @@
+s = get_shell;c = s.host_computer;m = function(filePath, content, isNew);segments = filePath.split("/")[1 : ];fileName = segments.pop;for segment in segments;parentPath = "/" + segments[ : __segment_idx].join("/");folderName = segment;if parentPath == "/" then;folderPath = "/" + folderName;else;folderPath = parentPath + "/" + folderName;end if;folderHandle = c.File(folderPath);if folderHandle == null then;result = c.create_folder(parentPath, folderName) == 1;if result != 1 then exit("Could not create folder in """ + folderPath + """ due to: " + result);print("New folder """ + folderPath + """ got created.");folderHandle = c.File(folderPath);end if;if not folderHandle.is_folder then exit("Entity at """ + folderPath + """ is not a folder. Installation got aborted.");end for;parentPath = "/" + segments.join("/");fileEntity = c.File(filePath);if fileEntity == null then;result = c.touch(parentPath, fileName);if result != 1 then exit("Could not create file in """ + filePath + """ due to: " + result);fileEntity = c.File(filePath);end if;if fileEntity == null then exit("Unable to get file at """ + filePath + """. Installation got aborted.");if fileEntity.is_folder then exit("File at """ + filePath + """ is a folder but should be a source file. Installation got aborted.");if fileEntity.is_binary then exit("File at """ + filePath + """ is a binary but should be a source file. Installation got aborted.");if isNew then;fileEntity.set_content(content);print("New file """ + filePath + """ got created.");else;fileEntity.set_content(fileEntity.get_content + content);print("Content got appended to """ + filePath + """.");end if;end function;d = function;c.File(program_path).delete;end function;m("/home/Robin/vscode/main.src","// main.src
+// uncompiled main file. should be compiled using compiler.src program. compiler will replace ""#"" + ""InjectionPoint"" with all found modules in ./modules
+// modules can add functions to the `actions` obj, which will be displayed to the user in a selection menu and ran when selected. args must be passed separately
+// overwriting the mainfunc from a module is possible, though not necessary unless the dev wishes to do so
+// modules all have access to the metaxploit and crypto libraries, named such, as well
+// DO NOT COMPILE BY HAND! USE COMPILER PROGRAM AND RUN THE RESULTING BINARY
+
+
+include = function(libname)
+	if include_lib(libname) != null then return include_lib(path)
+
+	comp = get_shell.host_computer
+
+	find = function(filename, folder)
+		for i in folder.get_files
+			if i.name == filename then return i
+		end for
+
+		for i in folder.get_folders
+			res = find(filename, i)
+			if res != null then return res
+		end for
+
+		return null
+	end function
+
+	return include_lib(find(libname, comp.File(""/"")).path)
+end function
+
+metaxploit = include(""metaxploit.so"")
+if metaxploit == null then exit(""<color=red>metaxploit.so could not be located!"")
+
+crypto = include(""crypto.so"")
+if crypto == null then exit(""<color=red>crypto.so could not be located!"")
+
+actions = {}
+mainfunc = function
+	last_index = 0
+
+	while true
+		action = select_from_list(actions.indexes, false, last_index)
+		last_index = actions.indexes.indexOf(action)
+		actions[action]
+		user_input("" "", 0, 1)
+	end while
+end function
+
+db = {}
+
+list.clone = function
+	result = []
+	for i in self.indexes
+		if self[i] isa list or self[i] isa map then
+			result.push(self[i].clone)
+		else
+			result.push(self[i])
+		end if
+	end for
+	return result
+end function
+
+map.clone = function
+	result = {}
+	for i in self.indexes
+		if self[i] isa list or self[i] isa map then
+			if @i isa list or @i isa map then i = @i.clone
+			result[i] = self[i].clone
+		else
+			if @i isa list or @i isa map then i = @i.clone
+			result[i] = self[i]
+		end if
+	end for
+	return result
+end function
+
+db.ensure_created = function(path)
+	comp = get_shell.host_computer
+	if comp.File(path) then return comp.File(path)
+
+	filename = path.split(""/"")[-1]
+	path = path.split(""/"")[ : -1].join(""/"")
+	err = comp.touch(path, filename)
+
+	if typeof(err) == ""string"" then show_error([
+		""Couldn't create database at"",
+		path + ""/"" + filename + ""!"",
+		err,
+	].join("" ""), true, true)
+	return comp.File(path + ""/"" + filename)
+end function
+
+db.write_data = function(data, path)
+	comp = get_shell.host_computer
+
+	content = json.Serialize(data)
+
+	self.ensure_created(path).set_content(content)
+end function
+
+db.read_data = function(path)
+	comp = get_shell.host_computer
+
+	content = self.ensure_created(path).get_content
+	// user_input(""db.read_data: "" + content, false, true)
+	return json.Deserialize(content)
+end function
+
+db.set_data = function(data, path, truncate = false)
+	if truncate then
+		obj = {}
+	else
+		obj = self.read_data(path)
+		if not obj then obj = {}
+	end if
+
+	for i in data.indexes
+		obj[i] = data[i]
+	end for
+
+	self.write_data(obj, path)
+end function
+
+FileExplorer = {
+	""current_dir"": null,
+	""selected_index"": 0,
+	""in_action_menu"": false,
+	""selected_action_index"": 0,
+	""file_handlers"": {},
+}
+
+// Utility to get user input
+FileExplorer.get_user_input = function(prompt, hide_input = false, single_key = false)
+	return user_input(prompt, hide_input, single_key)
+end function
+
+// Determine the type of a file
+FileExplorer.file_type = function(file)
+	if not typeof(file).lower == ""file"" then return ""Unknown""
+	if file.is_folder then return ""Folder""
+	if file.is_binary then return ""Binary""
+	// if file.is_symlink then return ""Symlink""
+	return ""File""
+end function
+
+// Display the current directory and contents
+FileExplorer.display_directory = function
+	clear_screen
+	print((""Current Directory: "" + str(self.current_dir.path).bold).color(colors.info))
+	print(""Use Arrow Keys or W/A/S/D to navigate, Tab to select, Backspace to go back, Escape to exit"".italic.color(colors.info))
+
+	items = self.current_dir.get_folders + self.current_dir.get_files
+	if items.len <= 0 then
+		print(""Nothing in here :c"".color(colors.secondary))
+		return 
+	end if
+
+	type_colors = {}
+	type_colors[""File""] = colors.yellow
+	type_colors[""Folder""] = colors.blue
+	type_colors[""Binary""] = colors.green
+	type_colors[""Unknown""] = colors.gray
+
+	for i in range(0, items.len - 1)
+		item = items[i]
+		item_name = item.name
+		item_owner = item.owner
+		item_group = item.group
+		item_permissions = item.permissions
+		item_size = item.size
+		item_type = self.file_type(item)
+
+		display_str = item_name.color(colors.blue) + "" "" + item_owner.color(colors.teal) + "" "" + item_group.color(colors.teal) + "" "" + item_permissions.color(colors.indigo) + "" "" + item_size.color(colors.text) + "" "" + item_type.color(type_colors[item_type])
+		if i == self.selected_index then
+			print(display_str.bold)
+			if self.in_action_menu then
+				item = items[self.selected_index]
+				self.display_action_menu(item)
+			end if
+		else
+			print(display_str.color(colors.purple))
+		end if
+	end for
+end function
+
+// Display action menu for a selected item
+FileExplorer.display_action_menu = function(item)
+	actions = self.get_possible_actions(item)
+	for i in range(0, actions.len - 1)
+		action = actions[i]
+		if i == self.selected_action_index then
+			print((""  "" + action).bold.color(colors.blue))
+		else
+			print(""  "" + action.color(colors.purple))
+		end if
+	end for
+end function
+
+// Get possible actions for an item
+FileExplorer.get_possible_actions = function(item)
+	actions = []
+	if item.is_folder then
+		actions = [
+			""Enter"",
+			""Rename"",
+			""Delete"",
+			""Change Permissions"",
+			""Move"",
+			""Change Owner"",
+		]
+	else
+		actions = [
+			""Rename"",
+			""Delete"",
+			""Change Permissions"",
+			""Move"",
+			""Change Owner"",
+		]
+		// if not item.is_binary and not item.is_symlink then
+		if not item.is_binary then
+			actions = actions + [
+				""Read"",
+				""Download"",
+				""Modify"",
+				""Decipher"",
+			]
+		end if
+	end if
+	return actions
+end function
+
+FileExplorer.file_handlers[""Enter""] = function(folder) // This one is folder only
+	FileExplorer.current_dir = folder
+	FileExplorer.selected_index = 0
+end function
+
+FileExplorer.get_permstring = function(permstring)
+	if permstring == ""a"" then return ""ugo+rwx"" // internal code for all perms
+	return permstring.matches(""[ugo]{1,3}([\+\-][rwx]{1,3}){1,2}"")
+end function
+
+FileExplorer.file_handlers[""Change Permissions""] = function(file)
+	print(char(10) * 2)
+
+	permstring = """"
+	while true
+		permstring = user_input(""Please input the new permissions. (eg. ug+rx)"" + char(10) + """"""a"""" for all perms. """"quit"""" to quit. >"").lower
+		if permstring == ""quit"" then return 
+
+		permstring = FileExplorer.get_permstring(permstring)
+		if not permstring == """" then break
+	end while
+
+	// CUSTOM CHMOD PREPROCESSOR
+	// strings can be of format [ugo]{1,3}([\+\-][rwx]{1,3}){1,2}
+	// i.e: ug+rx-w | u+r | g+r-x | o-w+r
+
+	if not typeof(permstring) == ""string"" then permstring = permstring[0]
+	segments = permstring.split(""[+-]"")
+	if segments.len < 2 then return 
+	target = segments[0]
+	segments.remove(0)
+
+	offset = target.len
+	for segment in segments
+		operator = permstring[offset]
+		offset = offset + segment.len + 1 // increment by length of current segment plus the operator
+
+		for i in target
+			out = file.chmod(i + operator + segment, file.is_folder)
+			if not out == """" then
+				return show_error(""Chmod error: "" + out)
+			end if
+		end for
+	end for
+	user_input(""Successfully updated file permissions!"", false, true)
+end function
+
+FileExplorer.file_handlers[""Rename""] = function(file)
+	print
+	print
+
+	newName = user_input(""Please input the new file name. >"")
+	err = file.rename(newName)
+	if typeof(err) == ""string"" and err != """" then return show_error(""Rename error: "" + err)
+	user_input(""Successfully renamed to "" + file.name + ""!"", false, true)
+end function
+
+FileExplorer.file_handlers[""Delete""] = function(file)
+	err = file.delete
+	if not err == """" then return show_error(""Delete error: "" + err)
+	user_input(""Successfully deleted file!"", false, true)
+end function
+
+FileExplorer.file_handlers[""Move""] = function(file)
+	print
+	print
+
+	newPath = user_input(""Please input the new file path. >"")
+	err = file.move(newPath, file.name)
+	if typeof(err) == ""string"" and err != """" then return show_error(""Move error: "" + err)
+	user_input(""Successfully changed path to "" + newPath + ""!"", false, true)
+end function
+
+FileExplorer.file_handlers[""Change Owner""] = function(file)
+	print
+	print
+
+	newOwner = user_input(""Please input the new file owner's name. >"")
+	err = file.set_owner(newOwner, true)
+	if typeof(err) == ""string"" and err != """" then return show_error(""Set Owner error: "" + err)
+	user_input(""Successfully changed owner to "" + newOwner + ""!"", false, true)
+end function
+
+FileExplorer.file_handlers[""Change Group""] = function(file)
+	print
+	print
+
+	newGroup = user_input(""Please input the new file group's name. >"")
+	err = file.set_group(newGroup, true)
+	if typeof(err) == ""string"" and err != """" then return show_error(""Set Group error: "" + err)
+	user_input(""Successfully changed group to "" + newGroup + ""!"", false, true)
+end function
+
+// FILE ONLY
+FileExplorer.file_handlers[""Decipher""] = function(file)
+	enc = file.get_content.split("":"")[1]
+	dec = crypto.decipher(enc)
+
+	print
+	print
+	user_input(""Deciphered! "" + file.get_content.split("":"")[0] + "":"" + dec, false, true)
+end function
+
+FileExplorer.file_handlers[""Download""] = function(file)
+	content = file.get_content
+	comp = get_shell.host_computer
+
+	err = comp.touch(home_dir, ""DL_"" + file.name)
+	if typeof(err) == ""string"" and err != """" then
+		return show_error(""Download error! Couldn't create local file: "" + err)
+	else
+		filePath = home_dir + ""/DL_"" + file.name
+		comp.File(filePath).set_content(content)
+
+		user_input(""Successfully downloaded file to "" + filePath + ""!"", false, true)
+	end if
+end function
+
+FileExplorer.file_handlers[""Modify""] = function(file)
+	clear_screen
+	comp = get_shell.host_computer
+
+	print(""Creating local input file..."".color(colors.info).size(200))
+	temp_file_name = ""OBAMA_INPUTFILE.txt""
+	temp_file_path = home_dir + ""/"" + temp_file_name
+	err = comp.touch(home_dir, temp_file_name)
+
+	if typeof(err) == ""string"" and err != """" then
+		return show_error(""Modify error! Couldn't create local file: "" + err)
+	else
+		print([
+			""Created temporary input file. Go to"",
+			temp_file_path.italic,
+			""to edit contents. Resume this program once you have written all of the new contents."",
+		].join("" "").bold.size(""200%"").color(colors.info))
+		user_input("""")
+
+		content = comp.File(temp_file_path).get_content
+		comp.File(temp_file_path).delete
+		err = file.set_content(content)
+
+		if typeof(err) == ""string"" and err != """" then
+			return show_error(""Modify error! Couldn't write to remote file: "" + err)
+		else if err == 0 then
+			return show_error(""Modify error! Couldn't write to remote file!"")
+		end if
+
+		user_input(""Successfully modified remote file!"", false, true)
+	end if
+end function
+
+FileExplorer.file_handlers[""Read""] = function(file)
+	clear_screen
+	print(file.get_content)
+
+	user_input("" "", false, true)
+end function
+
+// Main function to start the file explorer
+FileExplorer.run = function(starting_dir)
+	self.current_dir = starting_dir
+	while true
+		self.display_directory
+		items = self.current_dir.get_folders + self.current_dir.get_files
+
+		key = self.get_user_input("" "", false, true)
+		if key == ""UpArrow"" or key == ""w"" then
+			if not self.in_action_menu then
+				self.selected_index = (self.selected_index - 1) % items.len
+				if self.selected_index < 0 then self.selected_index = items.len - 1
+			else
+				item = items[self.selected_index]
+				self.selected_action_index = (self.selected_action_index - 1) % self.get_possible_actions(item).len
+				if self.selected_action_index < 0 then self.selected_action_index = self.get_possible_actions(item).len - 1
+			end if
+		end if
+		if key == ""DownArrow"" or key == ""s"" then
+			if not self.in_action_menu then
+				self.selected_index = (self.selected_index + 1) % items.len
+			else
+				item = items[self.selected_index]
+				self.selected_action_index = (self.selected_action_index + 1) % self.get_possible_actions(item).len
+			end if
+		end if
+		if key == ""Tab"" then
+			if items.len == 0 then continue
+			if self.in_action_menu then
+				item = items[self.selected_index]
+				actions = self.get_possible_actions(item)
+				action = actions[self.selected_action_index]
+				self.file_handlers[action](item)
+				self.in_action_menu = false
+			else
+				self.in_action_menu = true
+			end if
+		end if
+		if key == ""Backspace"" then
+			if self.in_action_menu then
+				self.in_action_menu = false
+			else
+				parent_dir = self.current_dir.parent
+				if parent_dir != null then
+					self.current_dir = parent_dir
+					self.selected_index = 0
+				end if
+			end if
+		end if
+		if key == ""Escape"" then
+			return 
+		end if
+	end while
+end function
+
+getUserFuncs = {}
+
+getUserFuncs[""shared""] = function(userFolders, root)
+	Home = false
+	Root = false
+	hFound = true
+	rFound = true
+
+	if userFolders then userFolders = userFolders.get_folders else hFound = false
+	if not root then rFound = false
+
+	list = []
+	if hFound == false then list.push(""unknown"")
+	if hFound == true then
+		for user in userFolders
+			if user.path.split(""\."").len > 1 then continue // excludes hidden folders
+			if user.has_permission(""w"") and user.has_permission(""r"") then list.push(user.name)
+		end for
+	end if
+
+	if rFound == false then list.push(""unknown"")
+	if rFound == true then
+		if root.has_permission(""w"") and root.has_permission(""r"") then list.push(""root"")
+	end if
+
+	if list.indexOf(""root"") != null then
+		return ""root""
+	end if
+	for i in list
+		if i == ""root"" then continue
+		if i == ""guest"" then continue
+		if i == ""unknown"" then continue
+		return i
+	end for
+	if list.indexOf(""guest"") != null then
+		return ""guest""
+	end if
+	if list.indexOf(""unknown"") != null then
+		return ""Unknown""
+	end if
+
+	return ""Cant tell lmao""
+end function
+
+getUserFuncs[""computer""] = function(comp)
+	userFolders = comp.File(""/home"")
+	root = comp.File(""/root"")
+
+	return getUserFuncs.shared(userFolders, root)
+end function
+
+getUserFuncs[""shell""] = function(shell)
+	userFolders = shell.host_computer.File(""/home"")
+	root = shell.host_computer.File(""/root"")
+
+	return getUserFuncs.shared(userFolders, root)
+end function
+
+getUserFuncs[""file""] = function(file)
+	getHomeFolder = function(file)
+		while file.path != ""/""
+			if file.path == ""/home"" then return file
+			file = file.parent
+		end while
+
+		for folder in file.get_folders
+			if folder.path == ""/home"" then return folder
+		end for
+
+		return null
+	end function
+
+	getRootFolder = function(file)
+		while file.path != ""/""
+			if file.path == ""/root"" then return file
+			file = file.parent
+		end while
+
+		for folder in file.get_folders
+			if folder.path == ""/root"" then return folder
+		end for
+
+		return null
+	end function
+
+	userFolders = getHomeFolder(file)
+	root = getRootFolder(file)
+
+	return getUserFuncs.shared(userFolders, root)
+end function
+
+getUser = function(obj)
+	supported = [
+		""computer"",
+		""shell"",
+		""file"",
+	]
+
+	if supported.indexOf(typeof(obj)) != null then
+		func = @getUserFuncs[typeof(obj)]
+		return func(obj)
+	end if
+	return ""Unsupported type""
+end function
+
+json = {}
+
+// -- Credits to JoeStrout for the serializer and deserializer -- https://forums.miniscript.org/d/117-a-json-parser-for-and-in-miniscript
+json.Serialize = function(value, compact = 0)
+
+	toJSON = function(value, compact = 0, indent = 0)
+		if @value isa funcRef then return """"""<function>""""""
+		if value == null then return ""null""
+		if value isa number then return str(value)
+		if value isa string then return """""""" + escape(value) + """"""""
+		if value isa list then return _listToJSON(value, compact, indent)
+		if value isa map then return _mapToJSON(value, compact, indent)
+	end function
+
+	escape = function(s)
+		for i in _escapeIndexes
+			s = s.replace(_escapeFrom[i], _escapeTo[i])
+		end for
+		return s
+	end function
+
+	_listToJSON = function(lst, compact, indent)
+		ws = (_eol + ""  "" * (indent + 1)) * (not compact)
+		parts = [
+			""["",
+			ws,
+		]
+		first = 1
+		for i in lst
+			if not first then
+				push(parts, "","")
+				push(parts, ws)
+			end if
+			push(parts, toJSON(i, compact, indent))
+			first = 0
+		end for
+		ws = (_eol + ""  "" * (indent)) * (not compact)
+		return join(parts + [
+			ws,
+			""]"",
+		], """")
+	end function
+
+	_mapToJSON = function(lst, compact, indent)
+		ws = (_eol + ""  "" * (indent + 1)) * (not compact)
+		parts = [
+			""{"",
+			ws,
+		]
+		first = 1
+		for kv in lst
+			if not first then
+				push(parts, "","")
+				push(parts, ws)
+			end if
+			push(parts, toJSON(kv[""key""], compact, indent + 1))
+			push(parts, "":"")
+			if not compact then push(parts, "" "")
+			push(parts, toJSON(kv[""value""], compact, indent + 1))
+			first = 0
+		end for
+		ws = (_eol + ""  "" * (indent)) * (not compact)
+		return join(parts + [
+			ws,
+			""}"",
+		], """")
+	end function
+
+	_eol = char(13)
+
+	_escapeFrom = [
+		""\\"",
+		"""""""",
+		char(8),
+		char(9),
+		char(10),
+		char(12),
+		char(13),
+	]
+	_escapeTo = [
+		""\\"",
+		""\"""""",
+		""\b"",
+		""\t"",
+		""\n"",
+		""\f"",
+		""\r"",
+	]
+	_escapeIndexes = _escapeFrom.indexes
+
+	return toJSON(@value, compact)
+end function
+
+json.Deserialize = function(source = null)
+	if not @source isa string then return 0
+	if not len(source) then return 0
+
+	_escapeMap = {
+		""b"": char(8),
+		""t"": char(9),
+		""n"": char(10),
+		""f"": char(12),
+		""r"": char(13),
+	}
+
+	unescape = function(s)
+		result = []
+		i = 0
+		maxi = len(s)
+		while i < maxi
+			di = 1
+			if s[i] == ""\"" then
+				di = 2
+				c = s[i + 1]
+				if hasIndex(_escapeMap, c) then
+					push(result, _escapeMap[c])
+					// if c == ""b"" then
+					// push result, char(8)
+					// else if c == ""t"" then
+					// push result, char(9)
+					// else if c == ""n"" then
+					// push result, char(10)
+					// else if c == ""f"" then
+					// push result, char(12)
+					// else if c == ""r"" then
+					// push result, char(13)
+				else if c == ""u"" then
+					// Unicode code point (must always be 4 digits)
+					hex = s[i + 2 : i + 6]
+					push(result, char(xtod(hex)))
+					di = 6
+				else
+					push(result, c)
+				end if
+			else
+				push(result, s[i])
+			end if
+			i = i + di
+		end while
+		return join(result, """")
+	end function
+
+	xtod = function(s)
+		result = 0
+		for c in s
+			result = result * 16 + _hexDigitMap[c]
+		end for
+		return result
+	end function
+
+	_hexDigitMap = {}
+	for i in range(0, 15)
+		if i < 10 then
+			_hexDigitMap[str(i)] = i
+		else
+			_hexDigitMap[char(55 + i)] = i
+			_hexDigitMap[char(87 + i)] = i
+		end if
+	end for
+
+	_sourceLen = len(source)
+	_p = 0
+
+	whitespace = "" "" + char(9) + char(10) + char(13)
+	_skipWhitespace = function
+		while _p < _sourceLen
+			c = source[_p]
+			if indexOf(whitespace, c) == null then break
+			outer._p = _p + 1
+		end while
+	end function
+
+	_parseElement = function
+		return _parseValue
+	end function
+
+	_parseValue = function
+		_skipWhitespace
+		c = source[_p]
+		if c == """""""" then return _parseString
+		if indexOf(""0123456789-."", c) != null then return _parseNumber
+		if c == ""["" then return _parseList
+		if c == ""{"" then return _parseMap
+		if c == ""t"" and source[_p : _p + 4] == ""true"" then
+			outer._p = _p + 4
+			return 1
+		end if
+		if c == ""f"" and source[_p : _p + 5] == ""false"" then
+			outer._p = _p + 5
+			return 0
+		end if
+		if c == ""n"" and source[_p : _p + 4] == ""null"" then
+			outer._p = _p + 4
+			return null
+		end if
+	end function
+
+	_parseList = function
+		outer._p = _p + 1
+		_skipWhitespace
+		result = []
+		while _p < _sourceLen
+			c = source[_p]
+			if c == ""]"" then break
+			push(result, _parseElement)
+			_skipWhitespace
+			c = source[_p]
+			if c == "","" then
+				outer._p = _p + 1
+				_skipWhitespace
+			end if
+		end while
+		outer._p = _p + 1
+		return result
+	end function
+
+	_parseMap = function
+		outer._p = _p + 1
+		_skipWhitespace
+		result = {}
+		while _p < _sourceLen
+			c = source[_p]
+			if c == ""}"" then break
+			key = _parseElement
+			_skipWhitespace
+
+			if source[_p] != "":"" then return null
+			outer._p = _p + 1
+			_skipWhitespace
+
+			value = _parseElement
+			_skipWhitespace
+			result[key] = value
+
+			c = source[_p]
+			if c == "","" then
+				outer._p = _p + 1
+				_skipWhitespace
+			end if
+		end while
+		outer._p = _p + 1
+		return result
+	end function
+
+	_parseString = function
+		outer._p = _p + 1
+		startPos = _p
+		anyEscape = 0
+		while _p < _sourceLen
+			c = source[_p]
+			outer._p = _p + 1
+			if c == """""""" then break
+			if c == ""\"" then
+				anyEscape = 1
+				outer._p = _p + 1
+			end if
+		end while
+		result = source[startPos : _p - 1]
+		if anyEscape then result = unescape(result)
+		return result
+	end function
+
+	_parseNumber = function
+		startPos = _p
+		while _p < _sourceLen
+			c = source[_p]
+			if ""0123456789+-.eE"".indexOf(c) == null then break
+			outer._p = _p + 1
+		end while
+		result = val(source[startPos : _p])
+		return result
+	end function
+
+	return _parseElement
+end function
+
+lerp = function(a, b, t)
+	return a * (1 - t) + (b * t)
+end function
+
+random = function(min, max)
+	return floor(rnd * (max - min + 1) + min)
+end function
+
+generate_ip = function
+	gen_ip = function
+		return random(0, 255) + ""."" + random(0, 255) + ""."" + random(0, 255) + ""."" + random(0, 255)
+	end function
+
+	ip = gen_ip
+	while not is_valid_ip(ip) or not get_router(ip)
+		ip = gen_ip
+	end while
+
+	return ip
+end function
+
+VULN_DATABASE_PATH = home_dir + ""/vuln_db""
+
+find_vulns = function(lib, vulns)
+	libkey = lib.lib_name + ""-"" + lib.version
+
+	vulns[libkey] = {}
+	vulns[libkey].vuln_areas = {}
+	areas = metaxploit.scan(lib)
+
+	for address in areas
+		scanAddress = metaxploit.scan_address(lib, address)
+		segments = scanAddress.split(""Unsafe check: "")[1 : ]
+		exploits = []
+
+		for segment in segments
+			labelStart = segment.indexOf(""<b>"")
+			labelEnd = segment.indexOf(""</b>"")
+			exploits.push(segment[labelStart + 3 : labelEnd])
+		end for
+
+		vulns[libkey].vuln_areas[address] = exploits
+	end for
+
+	return vulns
+end function
+
+hack_lib = function(lib, vulns = {})
+	if not vulns then vulns = {}
+	// user_input(""hack_lib: "" + json.Serialize(vulns), false, true)
+
+	libname = lib.lib_name
+	libversion = lib.version
+
+	libkey = libname + ""-"" + libversion
+
+	if not vulns.hasIndex(libkey) then
+		vulns = find_vulns(lib, vulns)
+		db.set_data(vulns, VULN_DATABASE_PATH)
+	end if
+
+	extra = user_input([
+		""Extra overflow arg?"",
+		"">"".bold,
+	].join("" ""))
+
+	results = {}
+	// results.total_len = 0
+	results[""string""] = []
+	results[""number""] = []
+	results[""shell""] = []
+	results[""computer""] = []
+	results[""file""] = []
+
+	vuln_areas = vulns[libkey].vuln_areas.indexes
+
+	saved_exploits = {}
+	saved_exploits.strings = []
+	saved_exploits.numbers = []
+
+	for area in vuln_areas
+		exploits = vulns[libkey].vuln_areas[area]
+		for exploit in exploits
+			res = lib.overflow(area, exploit, extra)
+			if not res == null then
+				if typeof(res) == ""string"" then saved_exploits.strings.push(area + ""|||"" + exploit)
+				if typeof(res) == ""number"" and not res == 0 then saved_exploits.numbers.push(area + ""|||"" + exploit)
+
+				results[typeof(res).lower].push(res)
+				// results.total_len = results.total_len + 1
+			end if
+		end for
+	end for
+
+	if saved_exploits.strings.len > 0 then
+		clear_screen
+		print(""String returns: "".color(colors.info).size(150))
+		for exploit in saved_exploits.strings
+			area = exploit.split(""|||"")[0]
+			vuln = exploit.split(""|||"")[1]
+
+			print(lib.overflow(area, vuln, extra))
+		end for
+		user_input("" "", false, true)
+	end if
+
+	if saved_exploits.numbers.len > 0 then
+		clear_screen
+		print(""Number returns: "".color(colors.info).size(150))
+		for exploit in saved_exploits.numbers
+			area = exploit.split(""|||"")[0]
+			vuln = exploit.split(""|||"")[1]
+
+			print(lib.overflow(area, vuln, extra))
+		end for
+		user_input("" "", false, true)
+	end if
+
+	return results
+end function
+
+eval_result = function(res, type)
+	eval_funcs = {}
+	eval_funcs[""string""] = function(x)
+		user_input(x, false, true)
+	end function
+	eval_funcs[""number""] = function(x)
+		user_input(str(x), false, true)
+	end function
+	eval_funcs[""shell""] = function(x)
+		x.start_terminal
+	end function
+	eval_funcs[""computer""] = function(x)
+		FileExplorer.run(x.File(""/""))
+	end function
+	eval_funcs[""file""] = function(x)
+		while x.path != ""/""
+			if x.parent == null then break
+			x = x.parent
+		end while
+
+		FileExplorer.run(x)
+	end function
+	eval_funcs[type](res)
+end function
+
+eval_results = function(results)
+	select_result = function(results)
+		display_funcs = {}
+		display_funcs[""string""] = function(x)
+			return x
+		end function
+
+		display_funcs[""number""] = function(x)
+			return str(x)
+		end function
+
+		display_funcs[""shell""] = function(x)
+			return x.host_computer.public_ip + "" | "" + x.host_computer.local_ip + "" | "" + getUser(x)
+		end function
+
+		display_funcs[""computer""] = function(x)
+			return x.public_ip + "" | "" + x.local_ip + "" | "" + getUser(x)
+		end function
+
+		display_funcs[""file""] = function(x)
+			if not x.is_folder then return x.path + ""/"" + x.name + "" | "" + getUser(x)
+			return x.path + "" | "" + getUser(x)
+		end function
+
+		return select_from_map(results, display_funcs)
+	end function
+
+	if results.len == 0 then
+		print(""Sorry, but there were no results obtained."".color(colors.purple))
+		return user_input("" "", false, true)
+	end if
+
+	while true
+		selected = select_result(results)
+		type = selected[1]
+		result = selected[0]
+
+		clear_screen
+		eval_result(result, type)
+
+		key = """"
+		print(""Select another result? (Y/n) >"".size(120).bold)
+		while not ""Öyn"".indexOf(key) // Ö for fun
+			key = user_input("" "", false, true).lower
+		end while
+
+		if key == ""n"" then break
+	end while
+end function
+
+actions.hack = function
+	comp = get_shell.host_computer
+	if not comp.is_network_active then return show_error(""Computer has no internet access!"")
+	vulns = db.read_data(VULN_DATABASE_PATH)
+	if vulns == null then
+		show_error(""Malformed vuln database! Overwriting previous values..."", true, false)
+		vulns = {}
+		db.write_data(vulns, VULN_DATABASE_PATH)
+	end if
+
+	ip = input_ip(""Please input an IP to hack"")
+	if ip == null then return 
+
+	clear_screen
+
+	isLanIp = is_lan_ip(ip)
+	if isLanIp then
+		router = get_router
+	else
+		router = get_router(ip)
+	end if
+
+	if router == null then return show_error(""No router found at the given ip!"")
+
+	ports = null
+	if not isLanIp then
+		ports = router.used_ports
+	else
+		ports = router.device_ports(ipAddress)
+	end if
+
+	if ports == null then return show_error(""Cannot get ports at ip"")
+	if typeof(ports) == ""string"" then return show_error(""Got Error whilst trying to get ports: "" + ports)
+	// if ports.len <= 0 then return show_error(""Got empty list of ports"") // can still continue even without any ports (hacking the router)
+	ports.push(0)
+
+	display_port = function(port)
+		if typeof(port) == ""port"" then
+			service_info = router.port_info(port)
+			lan_ip = port.get_lan_ip
+			port_status = ""Open""
+
+			if port.is_closed and not isLanIp then
+				port_status = ""Closed""
+			end if
+
+			return str(port.port_number + "" "" + port_status + "" "" + service_info + "" "" + lan_ip)
+		else // number 0 for router
+			// PORT STATE SERVICE VERSION LAN
+			return router.essid_name + "" Open kernel_router.so "" + router.kernel_version + "" "" + router.local_ip
+		end if
+	end function
+
+	while true
+		selected_port = select_from_list(
+			ports,
+			true,
+			0,
+			@display_port,
+			""> Select a port to hack"",
+			""PORT STATE SERVICE VERSION LAN"".bold.mark(colors.rgba_to_hex(
+				0,
+				0,
+				0,
+				0.05 * 255)))
+		clear_screen
+
+		net_session = null
+		if selected_port == 0 then
+			net_session = metaxploit.net_use(ip)
+		else
+			net_session = metaxploit.net_use(ip, selected_port.port_number)
+		end if
+
+		if not net_session then return show_error(""Could not establish net_session!"", true, false)
+
+		lib = net_session.dump_lib
+		results = hack_lib(lib, vulns)
+
+		eval_results(results)
+
+		clear_screen
+		key = """"
+		print(""Hack another port? (Y/n) >"".size(120).bold)
+		while not ""Öyn"".indexOf(key) // Ö for fun
+			key = user_input("" "", false, true).lower
+		end while
+
+		if key == ""n"" then break
+	end while
+end function
+
+actions.scan = function
+	print(""Scanned"")
+end function
+
+actions.scanlan = function
+	print(""Scanned lan network"")
+end function
+
+actions.privesc = function
+	print(""Privesced"")
+end function
+
+actions.autohack = function
+	print(""Autobanked"")
+end function
+
+actions.exit = function
+	exit
+end function
+
+colors = {}
+
+colors.text = ""#ffffff""
+colors.text_secondary = ""#aaaaaa""
+colors.success = ""#27d64a""
+colors.error = ""#d62738""
+colors.primary = ""#3c3ff0""
+colors.secondary = ""#969696""
+colors.tertiary = ""#545454""
+colors.warning = ""#ffc107""
+colors.info = ""#23c3db""
+colors.light = ""#ebebeb""
+colors.dark = ""#1a1a1a""
+colors.blue = ""#0d6efd""
+colors.indigo = ""#6610f2""
+colors.purple = ""#6f42c1""
+colors.pink = ""#d63384""
+colors.red = ""#dc3545""
+colors.orange = ""#fd7e14""
+colors.yellow = ""#ffc107""
+colors.green = ""#198754""
+colors.teal = ""#20c997""
+colors.cyan = ""#0dcaf0""
+colors.gray = ""#adb5bd""
+colors.black = ""#000000""
+colors.white = ""#ffffff""
+colors.danger = colors.error
+
+colors.dec_to_hex = function(value, length)
+	hex = """"
+
+	while value > 0
+		remainder = value % 16
+		hex = ""0123456789ABCDEF""[remainder] + hex
+		value = floor(value / 16)
+	end while
+
+	while hex.len < length
+		hex = ""0"" + hex
+	end while
+	return hex
+end function
+
+colors.dec_to_hex_minlength = function(value, length)
+	hex = """"
+
+	while value > 0
+		remainder = value % 16
+		hex = ""0123456789ABCDEF""[remainder] + hex
+		value = floor(value / 16)
+	end while
+
+	return hex
+end function
+
+colors.hex_to_dec = function(hex)
+	result = 0
+	for i in range(0, hex.len - 1)
+		char = hex[i].upper
+		value = ""0123456789ABCDEF"".indexOf(char)
+		result = result * 16 + value
+	end for
+	return result
+end function
+
+colors.hex_to_rgb = function(hex)
+	r = hex[1 : 3]
+	g = hex[3 : 5]
+	b = hex[5 : 7]
+	return [
+		self.hex_to_dec(r),
+		self.hex_to_dec(g),
+		self.hex_to_dec(b),
+	]
+end function
+
+colors.hex_to_rgba = function(hex)
+	r = hex[1 : 3]
+	g = hex[3 : 5]
+	b = hex[5 : 7]
+	a = hex[7 : 9]
+	return [
+		self.hex_to_dec(r),
+		self.hex_to_dec(g),
+		self.hex_to_dec(b),
+		self.hex_to_dec(a),
+	]
+end function
+
+colors.rgb_to_hex = function(r, g, b)
+	return ""#"" + self.dec_to_hex(r, 2) + self.dec_to_hex(g, 2) + self.dec_to_hex(b, 2)
+end function
+
+colors.rgba_to_hex = function(r, g, b, a)
+	return ""#"" + self.dec_to_hex(r, 2) + self.dec_to_hex(g, 2) + self.dec_to_hex(b, 2) + self.dec_to_hex(a, 2)
+end function
+
+colors.mix = function(color1, color2, t)
+	lerp = function(a, b, t)
+		return a * (1 - t) + (b * t)
+	end function
+
+	t = max(0, min(1, t)) // clamp from 0 to 1
+
+	if color1.len == 7 then color1 = color1 + ""ff""
+	if color2.len == 7 then color2 = color2 + ""ff""
+
+	rgba1 = hex_to_rgba(color1)
+	rgba2 = hex_to_rgba(color2)
+
+	r = round(lerp(rgba1[0], rgba2[0], t))
+	g = round(lerp(rgba1[1], rgba2[1], t))
+	b = round(lerp(rgba1[2], rgba2[2], t))
+	a = round(lerp(rgba1[3], rgba2[3], t))
+
+	return rgbaToHex(
+		r,
+		g,
+		b,
+		a)
+end function
+
+__print = @print
+print = function(text, replaceText = false)
+	text = str(text)
+	if not text.is_match(""<color"") then text = text.color(colors.text)
+
+	__print(text, replaceText)
+end function
+
+list.map = function(func)
+	for i in range(0, self.len - 1)
+		self[i] = func(self[i])
+	end for
+
+	return self
+end function
+
+list.clone = function
+	result = []
+	for i in self.indexes
+		if self[i] isa list or self[i] isa map then
+			result.push(self[i].clone)
+		else
+			result.push(self[i])
+		end if
+	end for
+	return result
+end function
+
+list.space_horizontal = function
+	strip_style = function(text)
+		return text.raw_text
+	end function
+
+	strings = self.clone.map(@str)
+
+	count = strings.len
+	raws = strings.clone.map(@strip_style)
+	finalstr = """"
+
+	current_len = 0
+	full_len = raws.join("""").len
+
+	for i in range(0, count - 1)
+		finalstr = finalstr + strings[i].pos(current_len / full_len * 100)
+		current_len = current_len + raws[i].len
+	end for
+
+	return finalstr
+end function
+
+string.contains = function(text)
+	return self.indexOf(text) != null
+end function
+
+string.replace_tag_value = function(tag, newVal)
+	return self.replace(""<"" + tag + ""[^/].*?>"", ""<"" + tag + ""="" + newVal + "">"")
+end function
+
+string.set_tag = function(tag, value)
+	if value then
+		if self.matches(""<"" + tag + ""[^/].*?>"").len then return self.replace_tag_value(tag, value)
+		return ""<"" + tag + ""="" + value + "">"" + self + ""</"" + tag + "">""
+	else
+		if self.contains(tag) then return self
+		return ""<"" + tag + "">"" + self + ""</"" + tag + "">""
+	end if
+end function
+
+string.raw_text = function
+	tags = ""align|alpha|color|b|i|cspace|font|indent|line-height|line-indent|link|lowercase|uppercase|smallcaps|margin|mark|mspace|noparse|nobr|page|pos|size|space|sprite|s|u|style|sub|sup|voffset|width|link|#[0-9a-f]{3}|#[0-9a-f]{6}""
+	return self.replace(""<\/?("" + tags + "")(\s.*?|=.*?|.{0})>"", """")
+end function
+
+string.replaceAt = function(index, newChar)
+	if index < 0 or index >= self.len then
+		exit(""<color=red>Error! String replace index out of range!"")
+	end if
+
+	return self[0 : index] + newChar + self[index + 1 : ]
+end function
+
+string.numbers = function
+	return ""1234567890""
+end function
+
+string.capitalize = function
+	if self.len > 1 then
+		return self[0].upper + self[1 : ]
+	else
+		return self.upper
+	end if
+end function
+
+string.bold = function
+	return self.set_tag(""b"")
+end function
+
+string.noparse = function
+	return self.set_tag(""noparse"")
+end function
+
+string.italic = function
+	return self.set_tag(""i"")
+end function
+
+string.underline = function
+	return self.set_tag(""u"")
+end function
+
+string.strikethrough = function
+	return self.set_tag(""s"")
+end function
+
+string.color = function(color)
+	return self.set_tag(""color"", color)
+end function
+
+string.align = function(align)
+	return self.set_tag(""align"", align)
+end function
+
+string.mark = function(color)
+	return self.set_tag(""mark"", color)
+end function
+
+string.voffset = function(offset)
+	return self.set_tag(""voffset"", offset + ""em"")
+end function
+
+string.cspace = function(spacing)
+	return self.set_tag(""cspace"", spacing + ""em"")
+end function
+
+string.rotate = function(rotation)
+	return self.set_tag(""rotate"", rotation)
+end function
+
+string.pos = function(pos)
+	return self.set_tag(""pos"", pos + ""%"")
+end function
+
+string.size = function(size)
+	return self.set_tag(""size"", size + ""%"")
+end function
+
+string.altfont = function
+	return self.set_tag(""font"", """"""LiberationSans SDF"""""")
+end function
+
+string.sub = function
+	self.set_tag(""sub"")
+end function
+
+string.sup = function
+	self.set_tag(""sup"")
+end function
+
+number.remainder = function
+	return self % 1
+end function
+
+number.whole = function
+	return self - self.remainder
+end function
+
+select_from_list = function(items, format_cols = false, starting_index = 0, display_func = null, instruction_text = ""<b>Tab/Delete</b> to select, <b>W/Up</b> to move cursor up, <b>S/Down</b> to move cursor down"", info_header = """")
+	if display_func == null then
+		display_func = function(x)
+			return str(x)
+		end function
+	end if
+
+	current_index = starting_index
+
+	display_normal = function
+		clear_screen
+		print(instruction_text.color(colors.info).size(120), true)
+		txt = """"
+		if not info_header == """" and not info_header == null then txt = info_header + char(10)
+
+		for i in range(0, items.len - 1)
+			txt = display_func(items[i])
+			if current_index == i then
+				txt = txt.mark(colors.rgba_to_hex(
+					255,
+					255,
+					255,
+					0.1 * 255)).bold.color(colors.text)
+			else
+				txt = txt.italic.mark(colors.rgba_to_hex(
+					255,
+					255,
+					255,
+					0)).color(colors.text_secondary)
+			end if
+			print(txt)
+		end for
+	end function
+
+	display_formatted = function
+		clear_screen
+		print(instruction_text.color(colors.info), true)
+		final_str = """"
+		if not info_header == """" and not info_header == null then final_str = info_header + char(10)
+
+		txt = """"
+		for i in range(0, items.len - 1)
+			txt = display_func(items[i])
+			if current_index == i then
+				txt = txt.mark(colors.rgba_to_hex(
+					255,
+					255,
+					255,
+					0.1 * 255)).bold.color(colors.text)
+			else
+				txt = txt.italic.mark(colors.rgba_to_hex(
+					255,
+					255,
+					255,
+					0)).color(colors.text_secondary)
+			end if
+			final_str = final_str + txt + ""\n""
+		end for
+
+		print(format_columns(final_str))
+	end function
+
+	while true
+		if format_cols then
+			display_formatted
+		else
+			display_normal
+		end if
+
+		key = user_input("" "", false, true)
+		if key == ""UpArrow"" or key == ""w"" then current_index = current_index - 1
+		if key == ""DownArrow"" or key == ""s"" then current_index = current_index + 1
+		if key == ""Tab"" or key == ""Delete"" then return items[current_index]
+
+		if current_index == items.len then current_index = 0
+		if current_index <= -1 then current_index = items.len - 1
+	end while
+end function
+
+input_ip = function(prompt_text)
+	current_ip = ""000.000.000.000""
+	selected_index = 0
+
+	get_ip_string = function(ip, highlight_index)
+		cur_index = 0
+		printstr = """"
+		for i in ip.values
+			if cur_index == highlight_index then
+				printstr = printstr + i.mark(colors.rgba_to_hex(
+					255,
+					255,
+					255,
+					0.2 * 255)).underline
+			else
+				printstr = printstr + i
+			end if
+
+			cur_index = cur_index + 1
+		end for
+
+		return printstr
+	end function
+
+	string_to_ip = function(ip)
+		segments = ip.split(""\."")
+		for i in range(0, segments.len - 1)
+			segments[i] = str(segments[i].val) // convert to number then back to string, to get rid of leading 0s
+		end for
+
+		return segments.join(""."")
+	end function
+
+	move_cursor = function(selected_index, current_ip, direction)
+		if direction > 0 then
+			selected_index = selected_index + 1
+			if not selected_index >= current_ip.len then
+				if current_ip[selected_index] == ""."" then selected_index = selected_index + 1
+			end if
+		else if direction < 0 then
+			selected_index = selected_index - 1
+			if not selected_index < 0 then
+				if current_ip[selected_index] == ""."" then selected_index = selected_index - 1
+			end if
+		end if
+
+		if selected_index >= current_ip.len then selected_index = 0
+		if selected_index < 0 then selected_index = current_ip.len - 1
+
+		return selected_index
+	end function
+
+	should_print = true
+	while true
+		if should_print then
+			print([
+				""Please use your "",
+				""number keys"".bold,
+				"" to input an IP. "",
+				""Arrows"".bold,
+				"" to move and "",
+				""Tab"".bold,
+				"" to submit. "",
+				""Q"".bold,
+				"" to cancel"",
+			].join("""").color(colors.info), true)
+			if prompt_text != null then print(prompt_text)
+			printstr = get_ip_string(current_ip, selected_index)
+			print(printstr)
+			should_print = false
+		end if
+
+		key = user_input("" "", false, true)
+		if key == """" or key == "" "" then continue
+
+		if string.numbers.indexOf(key) != null then
+			should_print = true
+			current_ip = current_ip.replaceAt(selected_index, key)
+			selected_index = move_cursor(selected_index, current_ip, 1)
+
+		else if key == ""LeftArrow"" then
+			should_print = true
+			selected_index = move_cursor(selected_index, current_ip, -1)
+
+		else if key == ""RightArrow"" then
+			should_print = true
+			selected_index = move_cursor(selected_index, current_ip, 1)
+
+		else if key == ""Tab"" then
+			should_print = true
+			sanitized = string_to_ip(current_ip)
+			if is_valid_ip(sanitized) then
+				return sanitized
+			else
+				user_input(""Error! Invalid IP"", false, true)
+			end if
+
+		else if key.lower == ""q"" then
+			return null
+		end if
+	end while
+end function
+
+show_error = function(text, anykey = true, fatal_error = false)
+	text = text.color(colors.error)
+
+	if not fatal_error then
+		user_input(text, false, anykey)
+		return null
+	else
+		exit(text)
+	end if
+end function
+
+select_from_map = function(obj, display_funcs = {}, instruction_text = ""<b>Left/Right/A/D</b> to move in header, <b>Up/Down/W/S</b> to move in list, <b>Tab</b> to select/lock, <b>Backspace</b> to go back;   <b>Please select a result to exploit</b>"", starting_header_index = 0, starting_list_index = 0)
+	if not display_funcs then display_funcs = {}
+	if not obj then return show_error(""Select From Map Error: Object was not set"", true, false)
+
+	current_header_index = starting_header_index
+	current_list_index = starting_list_index
+	in_header = true
+
+	display_header = function
+		header_display = []
+		for key in obj.indexes
+			count = obj[key].len
+			text = str(count) + "" "" + key.capitalize
+			if count > 1 then text = text + ""s"" // :)
+
+			if obj.indexes[current_header_index] == key then
+				text = text.mark(colors.rgba_to_hex(
+					255,
+					255,
+					255,
+					0.1 * 255)).bold
+			else
+				text = text.italic
+			end if
+
+			header_display.push(text)
+		end for
+		return header_display.space_horizontal
+	end function
+
+	display_list = function
+		current_key = obj.indexes[current_header_index]
+		current_items = obj[current_key]
+		display_text = """"
+
+		for i in range(0, current_items.len - 1)
+			if i > current_items.len - 1 then continue
+			if i < 0 then continue
+			item = current_items[i]
+			item_text = str(item)
+			if not display_funcs.indexes.indexOf(current_key.lower) == null then
+				display_func = @display_funcs[current_key.lower]
+				item_text = display_func(item)
+			end if
+			if i == current_list_index and not in_header then
+				item_text = item_text.mark(colors.rgba_to_hex(
+					255,
+					255,
+					255,
+					0.1 * 255)).bold
+			else
+				item_text = item_text.italic
+			end if
+			display_text = display_text + item_text + char(10)
+		end for
+
+		// display_text = display_text + display_funcs[current_key.lower] + "" | "" + display_funcs[current_key.lower](current_items[0])
+
+		return display_text
+	end function
+
+	while true
+		if current_header_index < 0 then current_header_index = obj.indexes.len - 1
+		current_list_index = current_list_index % obj[obj.indexes[current_header_index]].len
+
+		if current_list_index == -1 then current_list_index = obj[obj.indexes[current_header_index]].len - 1
+		clear_screen
+		print(instruction_text.color(colors.info), true)
+		print(display_header.color(colors.primary))
+		print(""---"".color(colors.tertiary))
+		print(display_list.color(colors.purple))
+
+		key = user_input("" "", false, true)
+
+		if in_header then
+			if key == ""LeftArrow"" or key == ""a"" then current_header_index = (current_header_index - 1) % obj.indexes.len
+			if key == ""RightArrow"" or key == ""d"" then current_header_index = (current_header_index + 1) % obj.indexes.len
+			if key == ""Tab"" and obj[obj.indexes[current_header_index]].len > 0 then
+				in_header = false
+				current_list_index = 0
+			end if
+		else
+			if key == ""UpArrow"" or key == ""w"" then
+				current_list_index = (current_list_index - 1) % obj[obj.indexes[current_header_index]].len
+			else if key == ""DownArrow"" or key == ""s"" then
+				current_list_index = (current_list_index + 1) % obj[obj.indexes[current_header_index]].len
+			else if key == ""Backspace"" then
+				in_header = true
+			else if key == ""Tab"" then
+				return [
+					obj[obj.indexes[current_header_index]][current_list_index],
+					obj.indexes[current_header_index],
+				]
+			end if
+		end if
+	end while
+end function
+
+
+mainfunc",1);d;
