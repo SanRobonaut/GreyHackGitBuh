@@ -213,7 +213,7 @@ select_from_list = function(items, format_cols = false, starting_index = 0, disp
             display_normal
         end if
 
-        key = user_input("", false, true)
+        key = user_input(" ", false, true)
         if key == "UpArrow" or key == "w" then current_index = current_index - 1
         if key == "DownArrow" or key == "s" then current_index = current_index + 1
         if key == "Tab" or key == "Delete" then return items[current_index]
@@ -281,7 +281,7 @@ input_ip = function(prompt_text)
             should_print = false
         end if
         
-        key = user_input("", false, true)
+        key = user_input(" ", false, true)
         if key == "" or key == " " then continue
 
         if string.numbers().indexOf(key) != null then
@@ -324,7 +324,8 @@ show_error = function(text, anykey = true, fatal_error = false)
 end function
 
 select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/Right/A/D</b> to move in header, <b>Up/Down/W/S</b> to move in list, <b>Tab</b> to select/lock, <b>Backspace</b> to go back;   <b>Please select a result to exploit</b>", starting_header_index = 0, starting_list_index = 0)
-    if display_funcs == null then display_funcs = {}
+    if not display_funcs then display_funcs = {}
+    if not obj then return show_error("Select From Map Error: Object was not set", true, false)
 
     current_header_index = starting_header_index
     current_list_index = starting_list_index
@@ -333,18 +334,17 @@ select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/
     display_header = function()
         header_display = []
         for key in obj.indexes
-            count = obj[key].len
-            if count > 0 then 
-                text = str(count) + " " + key.capitalize
-                if count > 1 then text = text + "s" // :)
-                
-                if obj.indexes[current_header_index] == key then
-                    text = text.mark(rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
-                else
-                    text = text.italic()
-                end if
-                header_display.push(text)
+            count = obj[key].len 
+            text = str(count) + " " + key.capitalize
+            if count > 1 then text = text + "s" // :)
+            
+            if obj.indexes[current_header_index] == key then
+                text = text.mark(rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
+            else
+                text = text.italic()
             end if
+
+            header_display.push(text)
         end for
         return header_display.space_horizontal
     end function
@@ -355,9 +355,14 @@ select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/
         display_text = ""
 
         for i in range(0, current_items.len - 1)
+            if i > current_items.len - 1 then continue
+            if i < 0 then continue
             item = current_items[i]
             item_text = str(item)
-            if not display_funcs.indexes.indexOf(current_key.lower) == null then item_text = display_funcs[current_key.lower](item)
+            if not display_funcs.indexes.indexOf(current_key.lower) == null then
+                display_func = @display_funcs[current_key.lower]
+                item_text = display_func(item)
+            end if
             if i == current_list_index and not in_header then
                 item_text = item_text.mark(rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
             else
@@ -372,15 +377,17 @@ select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/
     end function
 
     while true
+        if current_header_index < 0 then current_header_index = obj.indexes.len - 1
         current_list_index = current_list_index % obj[obj.indexes[current_header_index]].len
+
         if current_list_index == -1 then current_list_index = obj[obj.indexes[current_header_index]].len - 1
         clear_screen
-        print(instruction_text, true)
+        print(instruction_text + " | " + current_header_index + " - " + current_list_index, true)
         print(display_header())
         print("---")
         print(display_list())
 
-        key = user_input("", false, true)
+        key = user_input(" ", false, true)
 
         if in_header then
             if key == "LeftArrow" or key == "a" then current_header_index = (current_header_index - 1) % obj.indexes.len

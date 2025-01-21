@@ -1,18 +1,55 @@
-import_code("/Hacking Tool/modules/json.src")
-
 db = {}
+
+list.clone = function()
+    result = []
+    for i in self.indexes
+        if self[i] isa list or self[i] isa map then
+            result.push(self[i].clone)
+        else
+            result.push(self[i])
+        end if
+    end for
+    return result
+end function
+
+map.clone = function()
+    result={}
+    for i in self.indexes
+        if self[i] isa list or self[i] isa map then
+            if @i isa list or @i isa map then i = @i.clone
+            result[i] = self[i].clone
+        else
+            if @i isa list or @i isa map then i = @i.clone
+            result[i] = self[i]
+        end if
+    end for
+    return result
+end function
+
+db.ensure_created = function(path)
+    comp = get_shell.host_computer
+    if comp.File(path) then return comp.File(path)
+    
+    filename = path.split("/")[-1]
+    path = path.split("/")[:-1].join("/")
+    err = comp.touch(path, filename)
+
+    if typeof(err) == "string" then show_error(["Couldn't create database at", path + "/" + filename + "!", err].join(" "), true, true)
+    return comp.File(path + "/" + filename)
+end function
+
 db.write_data = function(data, path)
     comp = get_shell.host_computer
     
     content = json.Serialize(data)
 
-    comp.File(path).set_content(content)
+    self.ensure_created(path).set_content(content)
 end function
 
 db.read_data = function(path)
     comp = get_shell.host_computer
 
-    content = comp.File(path).get_content
+    content = self.ensure_created(path).get_content
     return json.Deserialize(content)
 end function
 
@@ -20,12 +57,13 @@ db.set_data = function(data, path, truncate = false)
     if truncate then
         obj = {}
     else
-        obj = read_data(path)
+        obj = self.read_data(path)
+        if not obj then obj = {}
     end if
 
     for i in data.indexes
         obj[i] = data[i]
     end for
 
-    write_data(obj, path)
+    self.write_data(obj, path)
 end function

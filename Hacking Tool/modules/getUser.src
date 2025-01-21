@@ -1,0 +1,100 @@
+getUserFuncs = {}
+
+getUserFuncs["shared"] = function(userFolders, root)
+    Home=false
+    Root=false
+    hFound=true
+    rFound=true
+
+    if userFolders then userFolders=userFolders.get_folders else hFound=false
+    if not root then rFound=false
+
+    list=[]
+    if hFound == false then list.push("unknown")
+    if hFound == true then
+        for user in userFolders
+            if user.path.split("\.").len > 1 then continue//excludes hidden folders
+            if user.has_permission("w") and user.has_permission("r") then list.push(user.name)
+        end for
+    end if
+
+    if rFound == false then list.push("unknown")
+    if rFound == true then
+        if root.has_permission("w") and root.has_permission("r") then list.push("root")
+    end if
+    
+    if list.indexOf("root") != null then
+        return "root"
+    end if
+    for i in list
+        if i == "root" then continue
+        if i == "guest" then continue
+        if i == "unknown" then continue
+        return i
+    end for
+    if list.indexOf("guest") != null then
+        return "guest"
+    end if
+    if list.indexOf("unknown") != null then
+        return "Unknown"
+    end if
+
+    return "Cant tell lmao"
+end function
+
+getUserFuncs["computer"] = function(comp)
+    userFolders = comp.File("/home")
+    root = comp.File("/root")
+
+    return getUserFuncs.shared(userFolders, root)
+end function
+
+getUserFuncs["shell"] = function(shell)
+    userFolders = shell.host_computer.File("/home")
+    root = shell.host_computer.File("/root")
+    
+    return getUserFuncs.shared(userFolders, root)
+end function
+
+getUserFuncs["file"] = function(file)
+    getHomeFolder = function(file)
+        while file.path != "/"
+            if file.path == "/home" then return file
+            file = file.parent
+        end while
+
+        for folder in file.get_folders
+            if folder.path == "/home" then return folder
+        end for
+
+        return null
+    end function
+
+    getRootFolder = function(file)
+        while file.path != "/"
+            if file.path == "/root" then return file
+            file = file.parent
+        end while
+
+        for folder in file.get_folders
+            if folder.path == "/root" then return folder
+        end for
+
+        return null
+    end function
+
+    userFolders = getHomeFolder(file)
+    root = getRootFolder(file)
+
+    return getUserFuncs.shared(userFolders, root)
+end function
+
+getUser = function(obj)
+    supported = ["computer", "shell", "file"]
+
+    if supported.indexOf(typeof(obj)) != null then
+		func = @getUserFuncs[typeof(obj)]
+		return func(obj)
+	end if
+    return "Unsupported type"
+end function

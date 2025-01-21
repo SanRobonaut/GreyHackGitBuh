@@ -41,7 +41,7 @@ mainfunc = function()
         action = select_from_list(actions.indexes, false, last_index)
         last_index = actions.indexes.indexOf(action)
         actions[action]
-        user_input("", 0, 1)
+        user_input(" ", 0, 1)
     end while
 end function
 

@@ -1,5 +1,5 @@
 while true
     keycode = ""
-    keycode = user_input("", false, true)
+    keycode = user_input(" ", false, true) // printing an empty string breaks user_input, printing " " instead
     print(keycode)
 end while

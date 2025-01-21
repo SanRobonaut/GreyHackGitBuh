@@ -48,6 +48,8 @@ make_new_file = function(src)
     res = get_shell.build(current_path + "/" + temp_filename, current_path, true)
     if res != "" then exit("Error building: " + res)
 
+    if comp.File(current_path + "/obama") then comp.File(current_path + "/obama").delete
+    
     comp.File(current_path + "/" + temp_filename[:-4]).rename("obama")
     tmp.delete()
 

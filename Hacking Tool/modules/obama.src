@@ -1,40 +1,40 @@
-// DEBUG: REMOVE FIRST 3 LINES OF CODE AND LAST LINE
-import_code("/Hacking Tool/modules/ui_helpers.src")
-import_code("/Hacking Tool/modules/database.src")
-import_code("/Hacking Tool/modules/file_explorer.src")
-include = function(libname)
-    if include_lib(libname) != null then return include_lib(path)
+// // DEBUG: REMOVE FIRST 3 LINES OF CODE AND LAST LINE
+// import_code("/Hacking Tool/modules/ui_helpers.src")
+// import_code("/Hacking Tool/modules/database.src")
+// import_code("/Hacking Tool/modules/file_explorer.src")
+// include = function(libname)
+//     if include_lib(libname) != null then return include_lib(path)
     
-    comp = get_shell.host_computer
+//     comp = get_shell.host_computer
 
-    find = function(filename, folder)
-        for i in folder.get_files
-            if i.name == filename then return i
-        end for
+//     find = function(filename, folder)
+//         for i in folder.get_files
+//             if i.name == filename then return i
+//         end for
 
-        for i in folder.get_folders
-            res = find(filename, i)
-            if res != null then return res
-        end for
+//         for i in folder.get_folders
+//             res = find(filename, i)
+//             if res != null then return res
+//         end for
 
-        return null
-    end function
+//         return null
+//     end function
 
-    return include_lib(find(libname, comp.File("/")).path)
-end function
+//     return include_lib(find(libname, comp.File("/")).path)
+// end function
 
-metaxploit = include("metaxploit.so")
-if metaxploit == null then exit("<color=red>metaxploit.so could not be located!")
+// metaxploit = include("metaxploit.so")
+// if metaxploit == null then exit("<color=red>metaxploit.so could not be located!")
 
-crypto = include("crypto.so")
-if crypto == null then exit("<color=red>crypto.so could not be located!")
-actions = {}
-// END OF TOP DEBUG
+// crypto = include("crypto.so")
+// if crypto == null then exit("<color=red>crypto.so could not be located!")
+// actions = {}
+// // END OF TOP DEBUG
 
 VULN_DATABASE_PATH = home_dir + "/vuln_db"
 
 find_vulns = function(lib, vulns)
-    libkey = libname + "-" + libversion
+    libkey = lib.lib_name + "-" + lib.version
 
     vulns[libkey] = {}
     vulns[libkey].vuln_areas = {}
@@ -58,6 +58,9 @@ find_vulns = function(lib, vulns)
 end function
 
 hack_lib = function(lib, vulns = {})
+    if not vulns then vulns = {}
+    // TODO: fix lib always being scanned
+
     libname = lib.lib_name
     libversion = lib.version
 
@@ -71,7 +74,7 @@ hack_lib = function(lib, vulns = {})
     extra = user_input(["Extra overflow arg?", ">".bold].join(" "))
 
     results = {}
-    results.total_len = 0
+    // results.total_len = 0
     results["string"] = []
     results["number"] = []
     results["shell"] = []
@@ -79,16 +82,48 @@ hack_lib = function(lib, vulns = {})
     results["file"] = []
 
     vuln_areas = vulns[libkey].vuln_areas.indexes
+    
+    saved_exploits = {}
+    saved_exploits.strings = []
+    saved_exploits.numbers = []
+
     for area in vuln_areas
         exploits = vulns[libkey].vuln_areas[area]
         for exploit in exploits
             res = lib.overflow(area, exploit, extra)
             if not res == null then
+                if typeof(res) == "string" then saved_exploits.strings.push(area + "|||" + exploit)
+                if typeof(res) == "number" and not res == 0 then saved_exploits.numbers.push(area + "|||" + exploit)
+
                 results[typeof(res).lower].push(res)
-                results.total_len = results.total_len + 1
+                // results.total_len = results.total_len + 1
             end if
         end for
     end for
+
+    if saved_exploits.strings.len > 0 then
+        clear_screen
+        print("String returns: ")
+        for exploit in saved_exploits.strings
+            area = exploit.split("|||")[0]
+            vuln = exploit.split("|||")[1]
+
+            print(lib.overflow(area, vuln, extra))
+        end for
+        user_input(" ", false, true)
+    end if
+
+    if saved_exploits.numbers.len > 0 then
+        clear_screen
+        print("Number returns: ")
+        for exploit in saved_exploits.numbers
+            area = exploit.split("|||")[0]
+            vuln = exploit.split("|||")[1]
+
+            print(lib.overflow(area, vuln, extra))
+        end for
+        user_input(" ", false, true)
+    end if
 
     return results
 end function
@@ -104,7 +139,7 @@ eval_result = function(res, type)
     eval_funcs["shell"] = function(x)
         x.start_terminal
     end function
-    eval_funcs["computer"] = function(x) // TODO: Add feature to (when you have root) create or delete users, change passwords, and (without root) monitor and close processes
+    eval_funcs["computer"] = function(x)
         FileExplorer.run(x.File("/"))
     end function
     eval_funcs["file"] = function(x)
@@ -131,20 +166,25 @@ eval_results = function(results)
         end function
 
         display_funcs["shell"] = function(x)
-            return x.host_computer.public_ip + " | " + x.host_computer.local_ip
+            return x.host_computer.public_ip + " | " + x.host_computer.local_ip + " | " + getUser(x)
         end function
 
         display_funcs["computer"] = function(x)
-            return x.public_ip + " | " + x.local_ip
+            return x.public_ip + " | " + x.local_ip + " | " + getUser(x)
         end function
 
         display_funcs["file"] = function(x)
-            if not x.is_folder then return x.path + "/" + x.name
-            return x.path
+            if not x.is_folder then return x.path + "/" + x.name + " | " + getUser(x)
+            return x.path + " | " + getUser(x)
         end function
 
         return select_from_map(results, display_funcs)
     end function
+
+    if results.len == 0 then
+        print("Sorry, but there were no results obtained.")
+        return user_input(" ", false, true)
+    end if
 
     while true
         selected = select_result(results)
@@ -157,7 +197,7 @@ eval_results = function(results)
         key = ""
         print("Select another result? (Y/n) >")
         while not "Öyn".indexOf(key) // Ö for fun
-            key = user_input("", false, true).lower
+            key = user_input(" ", false, true).lower
         end while
 
         if key == "n" then break
@@ -225,7 +265,7 @@ actions.hack = function()
         if selected_port == 0 then
             net_session = metaxploit.net_use(ip)
         else
-            net_session = metaxploit.net_use(ip, port.port_number)
+            net_session = metaxploit.net_use(ip, selected_port.port_number)
         end if
 
         if not net_session then return show_error("Could not establish net_session!", true, false)
@@ -238,7 +278,7 @@ actions.hack = function()
         key = ""
         print("Hack another port? (Y/n) >")
         while not "Öyn".indexOf(key) // Ö for fun
-            key = user_input("", false, true).lower
+            key = user_input(" ", false, true).lower
         end while
 
         if key == "n" then break
@@ -260,6 +300,3 @@ end function
 actions.autohack = function()
     print("Autobanked")
 end function
-
-// DEBUG: REMOVE THIS
-actions.hack

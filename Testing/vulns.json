@@ -1,0 +1,74 @@
+{
+    "libssh.so-1.0.3": {
+      "vuln_areas": {
+        "0x34CC5CB3": [
+          "square",
+          "ockbufficid",
+          "indopositializew"
+        ],
+        "0x78D16695": [
+          "ready",
+          "void",
+          "urly"
+        ],
+        "0x67194602": [
+          "avor",
+          "swindu",
+          "toket",
+          "portbackundostartedcaller32"
+        ],
+        "0x39353704": [
+          "pres",
+          "lock_sizedediagnostringbut"
+        ],
+        "0x143CAE6B": [
+          "cusedcolorsnorminu",
+          "ventimessignimation++"
+        ],
+        "0x793E0926": [
+          "itsstorewinvok",
+          "eady_de"
+        ]
+      }
+    },
+    "libssh.so-1.0.0": {
+      "vuln_areas": {
+        "0x34CC5CB3": [
+          "unchorev_maskt",
+          "ockbufficid",
+          "indopositializew"
+        ],
+        "0x78D16695": [
+          "ready",
+          "slinelinesre",
+          "sh_stored"
+        ],
+        "0x178C5D5E": [
+          "_ltreeenov",
+          "kremoutli",
+          "more",
+          "listroybuttonclicked"
+        ],
+        "0x66B46142": [
+          "emapmap",
+          "umsiobjecttratebytestenerspritextobjec",
+          "treestemplicked",
+          "odectsetfocuseuptimelecttransforman",
+          "sesourcelockblock_storeat"
+        ],
+        "0xDA0645E": [
+          "efalse",
+          "svisualbyt",
+          "efalsma",
+          "tlineslinelinenum"
+        ],
+        "0x2B760D14": [
+          "oseonsetf",
+          "teformanchoroffsetackund",
+          "emodecflushparam",
+          "n_dtreed",
+          "linenumenting_"
+        ]
+      }
+    }
+  }

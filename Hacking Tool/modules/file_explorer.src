@@ -240,7 +240,7 @@ FileExplorer.file_handlers["Read"] = function(file)
     clear_screen
     print(file.get_content)
 
-    user_input("", false, true)
+    user_input(" ", false, true)
 end function
 
 // Main function to start the file explorer
@@ -250,7 +250,7 @@ FileExplorer.run = function(starting_dir)
         self.display_directory()
         items = self.current_dir.get_folders() + self.current_dir.get_files()
         
-        key = self.get_user_input("", false, true)
+        key = self.get_user_input(" ", false, true)
         if key == "UpArrow" or key == "w" then
             if not self.in_action_menu then
                 self.selected_index = (self.selected_index - 1) % items.len
