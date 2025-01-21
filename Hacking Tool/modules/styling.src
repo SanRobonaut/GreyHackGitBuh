@@ -1,0 +1,117 @@
+import_code("/Hacking Tool/modules/ui_helpers.src")
+
+colors = {}
+
+colors.text           = "#ffffff"
+colors.text_secondary = "#aaaaaa"
+colors.success        = "#27d64a"
+colors.error          = "#d62738"
+colors.primary        = "#3c3ff0"
+colors.secondary      = "#969696"
+colors.tertiary       = "#545454"
+colors.warning        = "#ffc107"
+colors.info           = "#23c3db"
+colors.light          = "#ebebeb"
+colors.dark           = "#1a1a1a"
+colors.blue           = "#0d6efd"
+colors.indigo         = "#6610f2"
+colors.purple         = "#6f42c1"
+colors.pink           = "#d63384"
+colors.red            = "#dc3545"
+colors.orange         = "#fd7e14"
+colors.yellow         = "#ffc107"
+colors.green          = "#198754"
+colors.teal           = "#20c997"
+colors.cyan           = "#0dcaf0"
+colors.gray           = "#adb5bd"
+colors.black          = "#000000"
+colors.white          = "#ffffff"
+colors.danger         = colors.error
+
+colors.dec_to_hex = function(value, length)
+    hex = ""
+    
+    while value > 0
+        remainder = value % 16
+        hex = "0123456789ABCDEF"[remainder] + hex
+        value = floor(value / 16)
+    end while
+
+    while hex.len < length
+        hex = "0" + hex
+    end while
+    return hex
+end function
+
+colors.dec_to_hex_minlength = function(value, length)
+    hex = ""
+    
+    while value > 0
+        remainder = value % 16
+        hex = "0123456789ABCDEF"[remainder] + hex
+        value = floor(value / 16)
+    end while
+    
+    return hex
+end function
+
+colors.hex_to_dec = function(hex)
+    result = 0
+    for i in range(0, hex.len - 1)
+        char = hex[i].upper()
+        value = "0123456789ABCDEF".indexOf(char)
+        result = result * 16 + value
+    end for
+    return result
+end function
+
+colors.hex_to_rgb = function(hex)
+    r = hex[1:3]
+    g = hex[3:5]
+    b = hex[5:7]
+    return [self.hex_to_dec(r), self.hex_to_dec(g), self.hex_to_dec(b)]
+end function
+
+colors.hex_to_rgba = function(hex)
+    r = hex[1:3]
+    g = hex[3:5]
+    b = hex[5:7]
+    a = hex[7:9]
+    return [self.hex_to_dec(r), self.hex_to_dec(g), self.hex_to_dec(b), self.hex_to_dec(a)]
+end function
+
+colors.rgb_to_hex = function(r, g, b)
+    return "#" + self.dec_to_hex(r, 2) + self.dec_to_hex(g, 2) + self.dec_to_hex(b, 2)
+end function
+
+colors.rgba_to_hex = function(r, g, b, a)
+    return "#" + self.dec_to_hex(r, 2) + self.dec_to_hex(g, 2) + self.dec_to_hex(b, 2) + self.dec_to_hex(a, 2)
+end function
+
+colors.mix = function(color1, color2, t)
+    lerp = function(a, b, t)
+        return a * (1 - t) + (b * t)
+    end function
+
+    t = max(0, min(1, t)) // clamp from 0 to 1
+
+    if color1.len == 7 then color1 = color1 + "ff"
+    if color2.len == 7 then color2 = color2 + "ff"
+
+    rgba1 = hex_to_rgba(color1)
+    rgba2 = hex_to_rgba(color2)
+
+    r = round(lerp(rgba1[0], rgba2[0], t))
+    g = round(lerp(rgba1[1], rgba2[1], t))
+    b = round(lerp(rgba1[2], rgba2[2], t))
+    a = round(lerp(rgba1[3], rgba2[3], t))
+
+    return rgbaToHex(r, g, b, a)
+end function
+
+__print = @print
+print = function(text)
+    if not text.is_match("<color") then text = text.color(colors.text)
+
+    __print(text)
+end function

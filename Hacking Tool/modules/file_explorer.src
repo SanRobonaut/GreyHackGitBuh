@@ -11,13 +11,6 @@ FileExplorer.get_user_input = function(prompt, hide_input = false, single_key = 
     return user_input(prompt, hide_input, single_key)
 end function
 
-// Utility to display text with optional formatting
-FileExplorer.display_text = function(text, bold = false, italic = false)
-    if bold then text = "<b>" + text + "</b>"
-    if italic then text = "<i>" + text + "</i>"
-    print(text)
-end function
-
 // Determine the type of a file
 FileExplorer.file_type = function(file)
     if not typeof(file).lower == "file" then return "Unknown"
@@ -30,14 +23,20 @@ end function
 // Display the current directory and contents
 FileExplorer.display_directory = function()
     clear_screen
-    self.display_text("Current Directory: " + self.current_dir.path, true)
-    self.display_text("Use Arrow Keys or W/A/S/D to navigate, Tab to select, Backspace to go back, Escape to exit", false, true)
+    print(("Current Directory: " + str(self.current_dir.path).bold).color(colors.info))
+    print("Use Arrow Keys or W/A/S/D to navigate, Tab to select, Backspace to go back, Escape to exit".italic.color(colors.info))
     
     items = self.current_dir.get_folders() + self.current_dir.get_files()
     if items.len <= 0 then
-        print("Nothing in here :c")
+        print("Nothing in here :c".color(colors.secondary))
         return
     end if
+
+    type_colors = {}
+    type_colors["File"] = colors.yellow
+    type_colors["Folder"] = colors.blue
+    type_colors["Binary"] = colors.green
+    type_colors["Unknown"] = colors.gray
 
     for i in range(0, items.len - 1)
         item = items[i]
@@ -48,15 +47,15 @@ FileExplorer.display_directory = function()
         item_size = item.size()
         item_type = self.file_type(item)
 
-        display_str = item_name + " " + item_owner + " " + item_group + " " + item_permissions + " " + item_size + " " + item_type
+        display_str = item_name.color(colors.blue) + " " + item_owner.color(colors.teal) + " " + item_group.color(colors.teal) + " " + item_permissions.color(colors.indigo) + " " + item_size.color(colors.text) + " " + item_type.color(type_colors[item_type])
         if i == self.selected_index then
-            self.display_text(display_str, true)
+            print(display_str.bold)
             if self.in_action_menu then
                 item = items[self.selected_index]
                 self.display_action_menu(item)
             end if
         else
-            self.display_text(display_str)
+            print(display_str.color(colors.purple))
         end if
     end for
 end function
@@ -67,9 +66,9 @@ FileExplorer.display_action_menu = function(item)
     for i in range(0, actions.len - 1)
         action = actions[i]
         if i == self.selected_action_index then
-            self.display_text("  " + action, true)
+            print(("  " + action).bold.color(colors.blue))
         else
-            self.display_text("  " + action)
+            print("  " + action.color(colors.purple))
         end if
     end for
 end function
@@ -211,7 +210,7 @@ FileExplorer.file_handlers["Modify"] = function(file)
     clear_screen
     comp = get_shell.host_computer
     
-    print("Creating local input file...")
+    print("Creating local input file...".color(colors.info).size(200))
     temp_file_name = "OBAMA_INPUTFILE.txt"
     temp_file_path = home_dir + "/" + temp_file_name
     err = comp.touch(home_dir, temp_file_name)
@@ -219,7 +218,7 @@ FileExplorer.file_handlers["Modify"] = function(file)
     if typeof(err) == "string" and err != "" then
         return show_error("Modify error! Couldn't create local file: " + err)
     else
-        print(["Created temporary input file. Go to", temp_file_path.italic, "to edit contents. Resume this program once you have written all of the new contents."].join(" ").bold.size("200%"))
+        print(["Created temporary input file. Go to", temp_file_path.italic, "to edit contents. Resume this program once you have written all of the new contents."].join(" ").bold.size("200%").color(colors.info))
         user_input("")
 
         content = comp.File(temp_file_path).get_content

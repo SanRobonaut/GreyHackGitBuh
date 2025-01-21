@@ -33,11 +33,29 @@ list.space_horizontal = function()
     full_len = raws.join("").len
 
     for i in range(0, count - 1)
-        finalstr = finalstr + strings[i].pos(current_len / full_len * 100 + "%")
+        finalstr = finalstr + strings[i].pos(current_len / full_len * 100)
         current_len = current_len + raws[i].len
     end for
 
     return finalstr
+end function
+
+string.contains = function(text)
+    return self.indexOf(text) != null
+end function
+
+string.replace_tag_value = function(tag, newVal)
+    return self.replace("<"+ tag + "[^/].*?>", "<" + tag + "=" + newVal + ">")
+end function
+
+string.set_tag = function(tag, value)
+    if value then
+        if self.matches("<" + tag + "[^/].*?>").len then return self.replace_tag_value(tag, value)
+        return "<" + tag + "=" + value + ">" + self + "</" + tag + ">"
+    else
+        if self.contains(tag) then return self
+        return "<" + tag + ">" + self + "</" + tag + ">"
+    end if
 end function
 
 string.raw_text = function()
@@ -66,67 +84,67 @@ string.capitalize = function()
 end function
 
 string.bold = function()
-    return "<b>" + self + "</b>"
+    return self.set_tag("b")
 end function
 
 string.noparse = function()
-    return "<noparse>" + self + "</noparse>"
+    return self.set_tag("noparse")
 end function
 
 string.italic = function()
-    return "<i>" + self + "</i>"
+    return self.set_tag("i")
 end function
 
 string.underline = function()
-    return "<u>" + self + "</u>"
+    return self.set_tag("u")
 end function
 
 string.strikethrough = function()
-    return "<s>" + self + "</s>"
+    return self.set_tag("s")
 end function
 
 string.color = function(color)
-    return "<color=" + color + ">" + self + "</color>"
+    return self.set_tag("color", color)
 end function
 
 string.align = function(align)
-    return "<align=" + align + ">" + self + "</align>"
+    return self.set_tag("align", align)
 end function
 
 string.mark = function(color)
-    return "<mark=" + color + ">" + self + "</mark>"
+    return self.set_tag("mark", color)
 end function
 
 string.voffset = function(offset)
-    return "<voffset=" + offset + "em>" + self + "</voffset>"
+    return self.set_tag("voffset", offset + "em")
 end function
 
 string.cspace = function(spacing)
-    return "<cspace=" + spacing + "em>" + self + "</cspace>"
+    return self.set_tag("cspace", spacing + "em")
 end function
 
 string.rotate = function(rotation)
-    return "<rotate=" + rotation + ">" + self + "</rotate>"
+    return self.set_tag("rotate", rotation)
 end function
 
 string.pos = function(pos)
-    return "<pos=" + pos + ">" + self + "</pos>"
+    return self.set_tag("pos", pos + "%")
 end function
 
 string.size = function(size)
-    return "<size=" + size + ">" + self + "</size>"
+    return self.set_tag("size", size + "%")
 end function
 
 string.altfont=function()
-    return "<font=""LiberationSans SDF"">"+self+"</font>"
+    return self.set_tag("font", """LiberationSans SDF""")
 end function
 
 string.sub=function()
-    return "<sub>"+self+"</sub>"
+    self.set_tag("sub")
 end function
 
 string.sup=function()
-    return "<sup>"+self+"</sup>"
+    self.set_tag("sup")
 end function
 
 number.remainder = function()
@@ -135,29 +153,6 @@ end function
 
 number.whole = function()
     return self - self.remainder
-end function
-
-rgb_to_hex = function(r, g, b)
-    chars = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"]
-    hex = "#"
-    
-    hex = hex + chars[(r / 16).whole] + chars[(r / 16).remainder * 16]
-    hex = hex + chars[(g / 16).whole] + chars[(g / 16).remainder * 16]
-    hex = hex + chars[(b / 16).whole] + chars[(b / 16).remainder * 16]
-
-    return hex
-end function
-
-rgba_to_hex = function(r, g, b, a)
-    chars = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"]
-    hex = "#"
-    
-    hex = hex + chars[(r / 16).whole] + chars[(r / 16).remainder * 16]
-    hex = hex + chars[(g / 16).whole] + chars[(g / 16).remainder * 16]
-    hex = hex + chars[(b / 16).whole] + chars[(b / 16).remainder * 16]
-    hex = hex + chars[(a / 16).whole] + chars[(a / 16).remainder * 16]
-
-    return hex
 end function
 
 select_from_list = function(items, format_cols = false, starting_index = 0, display_func = null, instruction_text = "<b>Tab/Delete</b> to select, <b>W/Up</b> to move cursor up, <b>S/Down</b> to move cursor down", info_header = "")
@@ -171,16 +166,16 @@ select_from_list = function(items, format_cols = false, starting_index = 0, disp
 
     display_normal = function()
         clear_screen
-        print(instruction_text, true)
+        print(instruction_text.color(colors.info).size(120), true)
         txt = ""
         if not info_header == "" and not info_header == null then txt = info_header + char(10)
 
         for i in range(0, items.len - 1)
             txt = display_func(items[i])
             if current_index == i then 
-                txt = txt.mark(rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
+                txt = txt.mark(colors.rgba_to_hex(255, 255, 255, 0.1 * 255)).bold().color(colors.text)
             else
-                txt = txt.italic().mark(rgba_to_hex(255, 255, 255, 0))
+                txt = txt.italic().mark(colors.rgba_to_hex(255, 255, 255, 0)).color(colors.text_secondary)
             end if
             print(txt)
         end for
@@ -188,7 +183,7 @@ select_from_list = function(items, format_cols = false, starting_index = 0, disp
 
     display_formatted = function()
         clear_screen
-        print(instruction_text, true)
+        print(instruction_text.color(colors.info), true)
         final_str = ""
         if not info_header == "" and not info_header == null then final_str = info_header + char(10)
         
@@ -196,9 +191,9 @@ select_from_list = function(items, format_cols = false, starting_index = 0, disp
         for i in range(0, items.len - 1)
             txt = display_func(items[i])
             if current_index == i then 
-                txt = txt.mark(rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
+                txt = txt.mark(colors.rgba_to_hex(255, 255, 255, 0.1 * 255)).bold().color(colors.text)
             else
-                txt = txt.italic().mark(rgba_to_hex(255, 255, 255, 0))
+                txt = txt.italic().mark(colors.rgba_to_hex(255, 255, 255, 0)).color(colors.text_secondary)
             end if
             final_str = final_str + txt + "\n"
         end for
@@ -232,7 +227,7 @@ input_ip = function(prompt_text)
         printstr = ""
         for i in ip.values
             if cur_index == highlight_index then
-                printstr = printstr + i.mark(rgba_to_hex(255, 255, 255, 0.1 * 255))
+                printstr = printstr + i.mark(colors.rgba_to_hex(255, 255, 255, 0.1 * 255)).color(colors.teal)
             else
                 printstr = printstr + i
             end if
@@ -274,7 +269,7 @@ input_ip = function(prompt_text)
     should_print = true
     while true
         if should_print then
-            print(["Please use your ", "number keys".bold, " to input an IP. ", "Arrows".bold, " to move and ", "Tab".bold, " to submit. ", "Q".bold, " to cancel"].join(""), true)
+            print(["Please use your ", "number keys".bold, " to input an IP. ", "Arrows".bold, " to move and ", "Tab".bold, " to submit. ", "Q".bold, " to cancel"].join("").color(colors.info), true)
             if prompt_text != null then print(prompt_text)
             printstr = get_ip_string(current_ip, selected_index)
             print(printstr)
@@ -313,7 +308,7 @@ input_ip = function(prompt_text)
 end function
 
 show_error = function(text, anykey = true, fatal_error = false)
-    text = "<color=red>" + text
+    text = text.color(colors.error)
 
     if not fatal_error then
         user_input(text, false, anykey)
@@ -339,7 +334,7 @@ select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/
             if count > 1 then text = text + "s" // :)
             
             if obj.indexes[current_header_index] == key then
-                text = text.mark(rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
+                text = text.mark(colors.rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
             else
                 text = text.italic()
             end if
@@ -364,7 +359,7 @@ select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/
                 item_text = display_func(item)
             end if
             if i == current_list_index and not in_header then
-                item_text = item_text.mark(rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
+                item_text = item_text.mark(colors.rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
             else
                 item_text = item_text.italic()
             end if
@@ -382,10 +377,10 @@ select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/
 
         if current_list_index == -1 then current_list_index = obj[obj.indexes[current_header_index]].len - 1
         clear_screen
-        print(instruction_text + " | " + current_header_index + " - " + current_list_index, true)
-        print(display_header())
-        print("---")
-        print(display_list())
+        print(instruction_text.color(colors.info), true)
+        print(display_header().color(colors.primary))
+        print("---".color(colors.tertiary))
+        print(display_list().color(colors.purple))
 
         key = user_input(" ", false, true)
 

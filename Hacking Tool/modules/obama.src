@@ -103,7 +103,7 @@ hack_lib = function(lib, vulns = {})
 
     if saved_exploits.strings.len > 0 then
         clear_screen
-        print("String returns: ")
+        print("String returns: ".color(colors.info).size(150))
         for exploit in saved_exploits.strings
             area = exploit.split("|||")[0]
             vuln = exploit.split("|||")[1]
@@ -115,7 +115,7 @@ hack_lib = function(lib, vulns = {})
 
     if saved_exploits.numbers.len > 0 then
         clear_screen
-        print("Number returns: ")
+        print("Number returns: ".color(colors.info).size(150))
         for exploit in saved_exploits.numbers
             area = exploit.split("|||")[0]
             vuln = exploit.split("|||")[1]
@@ -182,7 +182,7 @@ eval_results = function(results)
     end function
 
     if results.len == 0 then
-        print("Sorry, but there were no results obtained.")
+        print("Sorry, but there were no results obtained.".color(colors.purple))
         return user_input(" ", false, true)
     end if
 
@@ -195,7 +195,7 @@ eval_results = function(results)
         eval_result(result, type)
 
         key = ""
-        print("Select another result? (Y/n) >")
+        print("Select another result? (Y/n) >".size(120).bold)
         while not "Öyn".indexOf(key) // Ö for fun
             key = user_input(" ", false, true).lower
         end while
@@ -258,7 +258,7 @@ actions.hack = function()
     end function
 
     while true
-        selected_port = select_from_list(ports, true, 0, @display_port, "> Select a port to hack", "PORT STATE SERVICE VERSION LAN".bold.mark(rgba_to_hex(0, 0, 0, 0.05 * 255)))
+        selected_port = select_from_list(ports, true, 0, @display_port, "> Select a port to hack", "PORT STATE SERVICE VERSION LAN".bold.mark(colors.rgba_to_hex(0, 0, 0, 0.05 * 255)))
         clear_screen
 
         net_session = null
@@ -276,7 +276,7 @@ actions.hack = function()
         eval_results(results)
 
         key = ""
-        print("Hack another port? (Y/n) >")
+        print("Hack another port? (Y/n) >".size(120).bold)
         while not "Öyn".indexOf(key) // Ö for fun
             key = user_input(" ", false, true).lower
         end while
