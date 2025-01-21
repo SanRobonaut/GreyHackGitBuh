@@ -359,9 +359,9 @@ select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/
                 item_text = display_func(item)
             end if
             if i == current_list_index and not in_header then
-                item_text = item_text.mark(colors.rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
+                item_text = item_text.mark(colors.rgba_to_hex(255, 255, 255, 0.1 * 255)).bold().color(colors.purple)
             else
-                item_text = item_text.italic()
+                item_text = item_text.italic().color(colors.purple)
             end if
             display_text = display_text + item_text + char(10)
         end for
@@ -380,7 +380,7 @@ select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/
         print(instruction_text.color(colors.info), true)
         print(display_header().color(colors.primary))
         print("---".color(colors.tertiary))
-        print(display_list().color(colors.purple))
+        print(display_list())
 
         key = user_input(" ", false, true)
 

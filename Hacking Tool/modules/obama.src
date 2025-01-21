@@ -205,6 +205,7 @@ actions.hack = function()
     // if ports.len <= 0 then return show_error("Got empty list of ports") // can still continue even without any ports (hacking the router)
     ports.push(0)
 
+    //TODO: fix the formatting on this shit, format columns kinda dies on this
     display_port = function(port)
         if typeof(port) == "port" then
             service_info = router.port_info(port)

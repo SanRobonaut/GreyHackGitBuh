@@ -101,7 +101,6 @@ db.read_data = function(path)
 	comp = get_shell.host_computer
 
 	content = self.ensure_created(path).get_content
-	// user_input("db.read_data: " + content, false, true)
 	return json.Deserialize(content)
 end function
 
@@ -171,13 +170,17 @@ FileExplorer.display_directory = function
 
 		display_str = item_name.color(colors.blue) + " " + item_owner.color(colors.teal) + " " + item_group.color(colors.teal) + " " + item_permissions.color(colors.indigo) + " " + item_size.color(colors.text) + " " + item_type.color(type_colors[item_type])
 		if i == self.selected_index then
-			print(display_str.bold)
+			print(display_str.bold.mark(colors.rgba_to_hex(
+				255,
+				255,
+				255,
+				0.2 * 255)))
 			if self.in_action_menu then
 				item = items[self.selected_index]
 				self.display_action_menu(item)
 			end if
 		else
-			print(display_str.color(colors.purple))
+			print(display_str)
 		end if
 	end for
 end function
@@ -871,7 +874,6 @@ end function
 
 hack_lib = function(lib, vulns = {})
 	if not vulns then vulns = {}
-	// user_input("hack_lib: " + json.Serialize(vulns), false, true)
 
 	libname = lib.lib_name
 	libversion = lib.version
@@ -1659,9 +1661,9 @@ select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/
 					255,
 					255,
 					255,
-					0.1 * 255)).bold
+					0.1 * 255)).bold.color(colors.purple)
 			else
-				item_text = item_text.italic
+				item_text = item_text.italic.color(colors.purple)
 			end if
 			display_text = display_text + item_text + char(10)
 		end for
@@ -1680,7 +1682,7 @@ select_from_map = function(obj, display_funcs = {}, instruction_text = "<b>Left/
 		print(instruction_text.color(colors.info), true)
 		print(display_header.color(colors.primary))
 		print("---".color(colors.tertiary))
-		print(display_list.color(colors.purple))
+		print(display_list)
 
 		key = user_input(" ", false, true)
 

@@ -49,13 +49,13 @@ FileExplorer.display_directory = function()
 
         display_str = item_name.color(colors.blue) + " " + item_owner.color(colors.teal) + " " + item_group.color(colors.teal) + " " + item_permissions.color(colors.indigo) + " " + item_size.color(colors.text) + " " + item_type.color(type_colors[item_type])
         if i == self.selected_index then
-            print(display_str.bold)
+            print(display_str.bold.mark(colors.rgba_to_hex(255, 255, 255, 0.2 * 255)))
             if self.in_action_menu then
                 item = items[self.selected_index]
                 self.display_action_menu(item)
             end if
         else
-            print(display_str.color(colors.purple))
+            print(display_str)
         end if
     end for
 end function
