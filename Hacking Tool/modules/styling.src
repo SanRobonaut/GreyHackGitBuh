@@ -25,6 +25,7 @@ colors.gray           = "#adb5bd"
 colors.black          = "#000000"
 colors.white          = "#ffffff"
 colors.danger         = colors.error
+colors.warn           = colors.warning
 
 colors.dec_to_hex = function(value, length)
     hex = ""
@@ -96,15 +97,15 @@ colors.mix = function(color1, color2, t)
     if color1.len == 7 then color1 = color1 + "ff"
     if color2.len == 7 then color2 = color2 + "ff"
 
-    rgba1 = hex_to_rgba(color1)
-    rgba2 = hex_to_rgba(color2)
+    rgba1 = colors.hex_to_rgba(color1)
+    rgba2 = colors.hex_to_rgba(color2)
 
     r = round(lerp(rgba1[0], rgba2[0], t))
     g = round(lerp(rgba1[1], rgba2[1], t))
     b = round(lerp(rgba1[2], rgba2[2], t))
     a = round(lerp(rgba1[3], rgba2[3], t))
 
-    return rgbaToHex(r, g, b, a)
+    return colors.rgba_to_hex(r, g, b, a)
 end function
 
 __print = @print

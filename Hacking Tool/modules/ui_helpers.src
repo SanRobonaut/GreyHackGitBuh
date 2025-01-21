@@ -58,6 +58,16 @@ string.set_tag = function(tag, value)
     end if
 end function
 
+string.fill_tag = function(tag, value)
+    if value then
+        if self.matches("<" + tag + "[^/].*?>").len then return self
+        return "<" + tag + "=" + value + ">" + self + "</" + tag + ">"
+    else
+        if self.contains(tag) then return self
+        return "<" + tag + ">" + self + "</" + tag + ">"
+    end if
+end function
+
 string.raw_text = function()
     tags = "align|alpha|color|b|i|cspace|font|indent|line-height|line-indent|link|lowercase|uppercase|smallcaps|margin|mark|mspace|noparse|nobr|page|pos|size|space|sprite|s|u|style|sub|sup|voffset|width|link|#[0-9a-f]{3}|#[0-9a-f]{6}"
     return self.replace("<\/?(" + tags + ")(\s.*?|=.*?|.{0})>", "")
@@ -155,7 +165,9 @@ number.whole = function()
     return self - self.remainder
 end function
 
-select_from_list = function(items, format_cols = false, starting_index = 0, display_func = null, instruction_text = "<b>Tab/Delete</b> to select, <b>W/Up</b> to move cursor up, <b>S/Down</b> to move cursor down", info_header = "")
+select_from_list = function(items, format_cols = false, starting_index = 0, display_func = null, instruction_text = null, info_header = "")
+    if instruction_text == null then instruction_text = "<b>Tab/Delete</b> to select, <b>W/Up</b> to move cursor up, <b>S/Down</b> to move cursor down".color(colors.info)
+
     if display_func == null then 
         display_func = function(x) 
             return str(x) 
@@ -166,16 +178,16 @@ select_from_list = function(items, format_cols = false, starting_index = 0, disp
 
     display_normal = function()
         clear_screen
-        print(instruction_text.color(colors.info).size(120), true)
+        print(instruction_text.fill_tag("color", colors.info), true)
         txt = ""
         if not info_header == "" and not info_header == null then txt = info_header + char(10)
 
         for i in range(0, items.len - 1)
             txt = display_func(items[i])
             if current_index == i then 
-                txt = txt.mark(colors.rgba_to_hex(255, 255, 255, 0.1 * 255)).bold().color(colors.text)
+                txt = txt.mark(colors.rgba_to_hex(255, 255, 255, 0.1 * 255)).bold()
             else
-                txt = txt.italic().mark(colors.rgba_to_hex(255, 255, 255, 0)).color(colors.text_secondary)
+                txt = txt.italic().mark(colors.rgba_to_hex(255, 255, 255, 0))
             end if
             print(txt)
         end for
@@ -183,22 +195,25 @@ select_from_list = function(items, format_cols = false, starting_index = 0, disp
 
     display_formatted = function()
         clear_screen
-        print(instruction_text.color(colors.info), true)
+        print(instruction_text.fill_tag("color", colors.info), true)
         final_str = ""
-        if not info_header == "" and not info_header == null then final_str = info_header + char(10)
-        
+        if not info_header == "" and not info_header == null then final_str = info_header.mark(colors.rgba_to_hex(255, 255, 255, 0)) + char(10)
+
         txt = ""
         for i in range(0, items.len - 1)
             txt = display_func(items[i])
             if current_index == i then 
-                txt = txt.mark(colors.rgba_to_hex(255, 255, 255, 0.1 * 255)).bold().color(colors.text)
+                txt = txt.mark(colors.rgba_to_hex(255, 255, 255, 0.1 * 255))
             else
-                txt = txt.italic().mark(colors.rgba_to_hex(255, 255, 255, 0)).color(colors.text_secondary)
+                txt = txt.mark(colors.rgba_to_hex(255, 255, 255, 0))
             end if
-            final_str = final_str + txt + "\n"
+            final_str = final_str + txt + char(10)
         end for
 
         print(format_columns(final_str))
+        // for line in final_str.split(char(10))
+        //     print("<noparse>" + line + "</noparse>")
+        // end for
     end function
 
     while true

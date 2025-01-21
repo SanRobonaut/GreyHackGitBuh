@@ -197,7 +197,7 @@ actions.hack = function()
     if not isLanIp then
         ports = router.used_ports
     else
-        ports = router.device_ports(ipAddress)
+        ports = router.device_ports(ip)
     end if
 
     if ports == null then return show_error("Cannot get ports at ip")
@@ -205,26 +205,40 @@ actions.hack = function()
     // if ports.len <= 0 then return show_error("Got empty list of ports") // can still continue even without any ports (hacking the router)
     ports.push(0)
 
-    //TODO: fix the formatting on this shit, format columns kinda dies on this
+    setColorFunc = function(x)
+        return x.color(colors.info)
+    end function
+
+    setColorTealFunc = function(x)
+        return str(x).color(colors.teal)
+    end function
+
+    setColorPrimaryFunc = function(x)
+        return str(x).color(colors.primary)
+    end function
+
     display_port = function(port)
         if typeof(port) == "port" then
-            service_info = router.port_info(port)
-            lan_ip = port.get_lan_ip
+            service_info = router.port_info(port).trim
+            service_name = service_info.split(" ")[0]
+            version = service_info.split(" ")[1]
+            lan_ip = port.get_lan_ip.trim
             port_status = "Open"
             
             if(port.is_closed and not isLanIp) then
                 port_status = "Closed"
             end if
 
-            return str(port.port_number + " " + port_status + " " + service_info + " " + lan_ip)
+            return [port.port_number, port_status, service_name, version, lan_ip].map(@setColorTealFunc).join(" ")
         else // number 0 for router
-            // PORT STATE SERVICE VERSION LAN
-            return router.essid_name + " Open kernel_router.so " + router.kernel_version + " " + router.local_ip
+            return [router.essid_name, "Open", "kernel_router.so", router.kernel_version, router.local_ip].map(@setColorPrimaryFunc).join(" ")
         end if
     end function
 
     while true
-        selected_port = select_from_list(ports, true, 0, @display_port, "> Select a port to hack", "PORT STATE SERVICE VERSION LAN".bold.mark(colors.rgba_to_hex(0, 0, 0, 0.05 * 255)))
+        selected_port = select_from_list(ports, true, 0, @display_port, 
+                                         "> Select a port to hack",
+                                         ["PORT", "STATE", "SERVICE", "VERSION", "LAN"].map(@setColorFunc).join(" "))
         clear_screen
 
         net_session = null
@@ -253,7 +267,98 @@ actions.hack = function()
 end function
 
 actions.scan = function()
-    print("Scanned")
+    comp = get_shell.host_computer
+    if not comp.is_network_active then return show_error("Computer has no internet access!")
+    
+    ip = input_ip("Please input an IP to scan")
+    if ip == null then return
+
+    clear_screen
+
+    isLanIp = is_lan_ip(ip)
+    if isLanIp then
+        router = get_router
+    else 
+        router = get_router(ip)
+    end if
+
+    if router == null then return show_error("No router found at the given ip!")
+
+    ports = null
+    if not isLanIp then
+        ports = router.used_ports
+    else
+        ports = router.device_ports(ip)
+    end if
+
+    if ports == null then return show_error("Cannot get ports at ip")
+    if typeof(ports) == "string" then return show_error("Got Error whilst trying to get ports: " + ports)
+
+    setColorFunc = function(x)
+        return x.color(colors.info)
+    end function
+
+    setColorTealFunc = function(x)
+        return str(x).color(colors.teal)
+    end function
+
+    setColorPrimaryFunc = function(x)
+        return str(x).color(colors.primary)
+    end function
+
+    info = ["PORT", "STATE", "SERVICE", "VERSION", "LAN"].map(@setColorFunc).join(" ").bold
+    for port in ports
+        service_info = router.port_info(port).trim
+        service_name = service_info.split(" ")[0]
+        version = service_info.split(" ")[1]
+        lan_ip = port.get_lan_ip.trim
+        port_status = "Open"
+        
+        if(port.is_closed and not isLanIp) then
+            port_status = "Closed"
+        end if
+
+        line = [port.port_number, port_status, service_name, version, lan_ip].map(@setColorTealFunc).join(" ")
+        info = info + char(10) + line
+    end for
+
+    line = [router.essid_name, "Open", "kernel_router.so", router.kernel_version, router.local_ip].map(@setColorPrimaryFunc).join(" ")
+    info = info + char(10) + line
+
+    print("Port info".bold.color(colors.info))
+    print(format_columns(info))
+    print("---".color(colors.tertiary))
+    print(char(10) + "Whois info".bold.color(colors.info))
+
+    adminInfo = whois(ip)
+    if isLanIp then adminInfo = whois(router.public_ip)
+
+    infoLines = adminInfo.split(char(10))
+    infoObject = {}
+    infoObject.domainName = infoLines[0].split(":")[1].trim
+    infoObject.administrativeContact = infoLines[1].split(":")[1].trim
+    infoObject.emailAddress = infoLines[2].split(":")[1].trim
+    infoObject.phone = infoLines[3].split(":")[1].trim
+    
+    for i in range(0, infoObject.indexes.len - 1)
+        color = colors.mix(colors.teal, colors.green, i / (infoObject.indexes.len - 1))
+        print([infoObject.indexes[i], ": ", infoObject[infoObject.indexes[i]]].join(" ").color(color))
+    end for
+
+    print("---".color(colors.tertiary))
+    print(char(10) + "Firewall info".bold.color(colors.info))
+
+    rules = router.firewall_rules
+    info = ["Action".color(colors.yellow), "Port".color(colors.pink), "Source".color(colors.blue), "Destination".color(colors.green)].join(" ")
+    for rule in rules
+        rule = rule.split(" ")
+        line = [rule[0].color(colors.yellow), rule[1].color(colors.pink), rule[2].color(colors.blue), rule[3].color(colors.green)].join(" ")
+        info = info + char(10) + line
+    end for
+
+    if rules.len == 0 then info = "No Firewall rules!".color(colors.warn)
+    print(format_columns(info))
+    user_input(" ", false, true)
 end function
 
 actions.scanlan = function()
